@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teleprompter · Respira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0F1720;
+    --bg-panel:#141F29;
+    --bg-panel-2:#1C2933;
+    --text-primary:#ECEFF3;
+    --text-dim:#7C8B9C;
+    --accent-teal:#7FB8A4;
+    --accent-sand:#E4B98E;
+    --line-hair:rgba(255,255,255,.08);
+    --font-display:'Fraunces', serif;
+    --font-ui:'Inter', system-ui, sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg-deep);}
+  .app{
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+    font-family:var(--font-ui); color:var(--text-primary);
+  }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap;
+    padding:14px 22px; background:var(--bg-panel);
+    border-bottom:1px solid var(--line-hair);
+  }
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand-mark{font-family:var(--font-display); font-size:20px; font-weight:500; letter-spacing:.01em;}
+  .brand-sub{font-family:var(--font-mono); font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.14em;}
+
+  .script-picker{display:flex; align-items:center; gap:8px;}
+  .script-picker label{font-size:12px; color:var(--text-dim); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.1em;}
+  select{
+    background:var(--bg-panel-2); color:var(--text-primary); border:1px solid var(--line-hair);
+    border-radius:8px; padding:7px 10px; font-family:var(--font-ui); font-size:13px; cursor:pointer;
+  }
+  select:focus-visible{outline:2px solid var(--accent-teal); outline-offset:2px;}
+
+  /* ---------- stage ---------- */
+  .stage{
+    position:relative; flex:1; overflow:hidden;
+    background:radial-gradient(ellipse at 50% 40%, #142030 0%, var(--bg-deep) 70%);
+  }
+  .reading-line{
+    position:absolute; left:6%; right:6%; top:42%; height:0; z-index:5;
+    border-top:1px solid rgba(127,184,164,.4);
+  }
+  .reading-line::before,.reading-line::after{
+    content:""; position:absolute; top:-4px; width:1px; height:9px; background:var(--accent-teal);
+  }
+  .reading-line::before{left:0;}
+  .reading-line::after{right:0;}
+
+  .fade-top,.fade-bottom{
+    position:absolute; left:0; right:0; height:20%; z-index:4; pointer-events:none;
+  }
+  .fade-top{top:0; background:linear-gradient(to bottom, var(--bg-deep), transparent);}
+  .fade-bottom{bottom:0; background:linear-gradient(to top, var(--bg-deep), transparent);}
+
+  .scroll-wrap{position:absolute; inset:0; transition:transform .35s ease;}
+  .scroll-wrap.mirrored{transform:scaleX(-1);}
+
+  #scriptText{
+    position:absolute; left:0; right:0; top:0;
+    padding:46vh 9vw 70vh;
+    font-size:52px;
+    will-change:transform;
+  }
+  #scriptText p{
+    font-family:var(--font-display); font-weight:500; line-height:1.45;
+    margin:0 0 .65em; text-align:center; color:var(--text-primary);
+  }
+  #scriptText p.direction{
+    font-style:italic; font-weight:400; font-size:.55em; color:var(--text-dim);
+  }
+  #scriptText p.section{
+    font-family:var(--font-mono); font-weight:500; font-size:.36em;
+    text-transform:uppercase; letter-spacing:.2em; color:var(--accent-sand);
+    margin:1.5em 0 .7em;
+  }
+
+  /* ---------- breathing guide ---------- */
+  .breath-ring{
+    position:absolute; left:20px; bottom:20px; width:56px; height:56px; z-index:6;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .breath-ring .ring{
+    position:absolute; inset:0; border-radius:50%; border:1.5px solid var(--accent-teal);
+    animation:breathe 8s ease-in-out infinite;
+  }
+  .breath-ring .core{width:7px; height:7px; border-radius:50%; background:var(--accent-teal);}
+  @keyframes breathe{
+    0%,100%{transform:scale(.7); opacity:.3;}
+    50%{transform:scale(1.18); opacity:.85;}
+  }
+
+  /* ---------- controls ---------- */
+  .controls{
+    display:flex; align-items:center; gap:24px; flex-wrap:wrap;
+    padding:14px 22px; background:var(--bg-panel); border-top:1px solid var(--line-hair);
+  }
+  .control-group{display:flex; align-items:center; gap:10px;}
+  .control-group .cg-label{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:.1em; min-width:64px;
+  }
+  .control-group .cg-value{
+    font-family:var(--font-mono); font-size:12px; color:var(--accent-sand); min-width:44px;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:120px; height:4px;
+    background:var(--bg-panel-2); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--accent-teal); cursor:pointer; border:2px solid var(--bg-deep);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%; background:var(--accent-teal);
+    cursor:pointer; border:2px solid var(--bg-deep);
+  }
+
+  button{
+    font-family:var(--font-ui); font-size:13px; font-weight:600; cursor:pointer;
+    border-radius:999px; padding:9px 18px; border:1px solid var(--line-hair);
+    background:var(--bg-panel-2); color:var(--text-primary); transition:background .15s ease;
+  }
+  button:hover{background:#243441;}
+  button:focus-visible{outline:2px solid var(--accent-teal); outline-offset:2px;}
+  button.primary{
+    background:var(--accent-teal); color:#0F1720; border:none;
+  }
+  button.primary:hover{background:#8fc6b2;}
+  button.active{background:var(--accent-sand); color:#0F1720; border:none;}
+
+  .hint{
+    font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);
+    letter-spacing:.03em; margin-left:auto;
+  }
+
+  @media (max-width:720px){
+    .controls{gap:14px;}
+    .hint{display:none;}
+    .control-group .cg-label{min-width:0;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Teleprompter</span>
+      <span class="brand-sub">Respira · Guion</span>
+    </div>
+    <div class="script-picker">
+      <label for="scriptSelect">Guion</label>
+      <select id="scriptSelect">
+        <option value="1">Guion 1 — Antes de seguir</option>
+        <option value="2">Guion 2 — Escucha tu cuerpo</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="fade-top"></div>
+    <div class="reading-line"></div>
+    <div class="scroll-wrap" id="scrollWrap">
+      <div id="scriptText"></div>
+    </div>
+    <div class="fade-bottom"></div>
+    <div class="breath-ring" title="Guía de respiración: inhala 4s, exhala 4s">
+      <div class="ring"></div>
+      <div class="core"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="playBtn">▶ Reproducir</button>
+    <button id="resetBtn">⟲ Reiniciar</button>
+
+    <div class="control-group">
+      <span class="cg-label">Velocidad</span>
+      <input type="range" id="speedSlider" min="10" max="200" value="40" step="2">
+      <span class="cg-value" id="speedValue">40</span>
+    </div>
+
+    <div class="control-group">
+      <span class="cg-label">Tamaño</span>
+      <input type="range" id="sizeSlider" min="24" max="96" value="52" step="2">
+      <span class="cg-value" id="sizeValue">52px</span>
+    </div>
+
+    <button id="mirrorBtn">⇄ Espejo</button>
+    <button id="fullscreenBtn">⤢ Pantalla completa</button>
+
+    <span class="hint">Espacio: play/pausa · ↑↓ velocidad · ←→ tamaño</span>
+  </div>
+
+</div>
+
+<script>
+  const scripts = {
+    "1": `
+      <p class="direction">Se escucha una inhalación profunda.</p>
+      <p class="section">Texto</p>
+      <p>Antes de seguir...</p>
+      <p>Respira conmigo.</p>
+      <p class="direction">(Haces una respiración lenta mirando a cámara.)</p>
+      <p class="section">Desarrollo</p>
+      <p>Respiras más de veinte mil veces al día...</p>
+      <p>Pero...</p>
+      <p>¿Alguna vez alguien te enseñó a respirar?</p>
+      <p>La mayoría pensamos que respirar es automático.</p>
+      <p>Y sí...</p>
+      <p>Lo es.</p>
+      <p>Pero respirar bien...</p>
+      <p>Eso se aprende.</p>
+      <p>Tu respiración cambia cuando tienes miedo.</p>
+      <p>Cuando estás estresado.</p>
+      <p>Cuando te preocupas.</p>
+      <p>Cuando vives demasiado tiempo en piloto automático.</p>
+      <p>Y lo más sorprendente...</p>
+      <p>Es que también funciona al revés.</p>
+      <p>Cuando cambias tu respiración...</p>
+      <p>Comienzas a cambiar la forma en la que se siente tu cuerpo.</p>
+      <p>Y cuando cambia tu cuerpo...</p>
+      <p>También cambia tu mente.</p>
+      <p class="section">Cierre</p>
+      <p>Durante las próximas semanas quiero enseñarte algo que nadie nos enseñó.</p>
+      <p>Cómo volver a ti...</p>
+      <p>Una respiración a la vez.</p>
+      <p class="direction">Respiración juntos.</p>
+      <p class="direction">Sonríes.</p>
+    `,
+    "2": `
+      <p class="direction">Se escucha una inhalación.</p>
+      <p class="section">Tu voz</p>
+      <p>Antes de seguir... respira conmigo.</p>
+      <p class="direction">Una respiración lenta.</p>
+      <p class="direction">Silencio de un segundo.</p>
+      <p>¿Te has dado cuenta de que tu cuerpo siempre intenta avisarte antes de que tú lo notes?</p>
+      <p>A veces aprietas la mandíbula.</p>
+      <p>O subes los hombros sin darte cuenta.</p>
+      <p>Respiras rápido.</p>
+      <p>Suspiras.</p>
+      <p>Sientes un nudo en el pecho.</p>
+      <p>Y piensas que tu cuerpo está fallando.</p>
+      <p>Pero no.</p>
+      <p>Tu cuerpo no está en tu contra.</p>
+      <p>Está intentando decirte algo.</p>
+      <p>La respiración es uno de sus idiomas.</p>
+      <p>Por eso, antes de preguntarte:</p>
+      <p>«¿Qué tengo que hacer?»</p>
+      <p>Hazte una pregunta diferente:</p>
+      <p>«¿Qué está intentando decirme mi respiración hoy?»</p>
+      <p>Escucharla puede ser el primer paso para volver a ti.</p>
+      <p class="section">Cierre</p>
+      <p>Mañana descubrirás una señal que muchas personas pasan por alto y que puede revelar si tu cuerpo está viviendo en estado de alerta.</p>
+    `
+  };
+
+  const textEl = document.getElementById('scriptText');
+  const scrollWrap = document.getElementById('scrollWrap');
+  const scriptSelect = document.getElementById('scriptSelect');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedValue = document.getElementById('speedValue');
+  const sizeSlider = document.getElementById('sizeSlider');
+  const sizeValue = document.getElementById('sizeValue');
+  const mirrorBtn = document.getElementById('mirrorBtn');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const app = document.getElementById('app');
+
+  let playing = false;
+  let lastTime = null;
+  let posY = 0;
+  let speed = parseFloat(speedSlider.value);
+
+  function loadScript(id){
+    textEl.innerHTML = scripts[id];
+    posY = 0;
+    textEl.style.transform = `translateY(0px)`;
+  }
+  loadScript(scriptSelect.value);
+  textEl.style.fontSize = sizeSlider.value + 'px';
+
+  function updatePlayBtn(){
+    playBtn.textContent = playing ? '⏸ Pausar' : '▶ Reproducir';
+  }
+
+  function tick(t){
+    if(lastTime === null) lastTime = t;
+    const dt = (t - lastTime) / 1000;
+    lastTime = t;
+    if(playing){
+      posY -= speed * dt;
+      textEl.style.transform = `translateY(${posY}px)`;
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    lastTime = null;
+    updatePlayBtn();
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    playing = false;
+    posY = 0;
+    textEl.style.transform = `translateY(0px)`;
+    updatePlayBtn();
+  });
+
+  speedSlider.addEventListener('input', ()=>{
+    speed = parseFloat(speedSlider.value);
+    speedValue.textContent = speedSlider.value;
+  });
+
+  sizeSlider.addEventListener('input', ()=>{
+    textEl.style.fontSize = sizeSlider.value + 'px';
+    sizeValue.textContent = sizeSlider.value + 'px';
+  });
+
+  scriptSelect.addEventListener('change', ()=>{
+    playing = false;
+    updatePlayBtn();
+    loadScript(scriptSelect.value);
+  });
+
+  mirrorBtn.addEventListener('click', ()=>{
+    scrollWrap.classList.toggle('mirrored');
+    mirrorBtn.classList.toggle('active');
+  });
+
+  fullscreenBtn.addEventListener('click', ()=>{
+    if(!document.fullscreenElement){
+      app.requestFullscreen().catch(()=>{});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.target.tagName === 'SELECT') return;
+    if(e.code === 'Space'){
+      e.preventDefault();
+      playing = !playing;
+      lastTime = null;
+      updatePlayBtn();
+    } else if(e.code === 'ArrowUp'){
+      e.preventDefault();
+      speedSlider.value = Math.min(200, parseFloat(speedSlider.value) + 5);
+      speed = parseFloat(speedSlider.value);
+      speedValue.textContent = speedSlider.value;
+    } else if(e.code === 'ArrowDown'){
+      e.preventDefault();
+      speedSlider.value = Math.max(10, parseFloat(speedSlider.value) - 5);
+      speed = parseFloat(speedSlider.value);
+      speedValue.textContent = speedSlider.value;
+    } else if(e.code === 'ArrowRight'){
+      e.preventDefault();
+      sizeSlider.value = Math.min(96, parseFloat(sizeSlider.value) + 2);
+      textEl.style.fontSize = sizeSlider.value + 'px';
+      sizeValue.textContent = sizeSlider.value + 'px';
+    } else if(e.code === 'ArrowLeft'){
+      e.preventDefault();
+      sizeSlider.value = Math.max(24, parseFloat(sizeSlider.value) - 2);
+      textEl.style.fontSize = sizeSlider.value + 'px';
+      sizeValue.textContent = sizeSlider.value + 'px';
+    }
+  });
+</script>
+</body>
+</html>
