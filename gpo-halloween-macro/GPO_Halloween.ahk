@@ -10,16 +10,12 @@
 ;  F6 = probar el alineado de cámara al Norte
 ;  F7 = diagnóstico (qué está leyendo de la pantalla)
 ;  F8 = cerrar el macro
+;  Todo esto también está en la ventana del macro (lo que elijas ahí se
+;  guarda en config.ini).
 ; ============================================================
 
 ; ---------------- CONFIGURACIÓN ----------------
-; Artículo a comprar cuando la bolsa se llena ("" = no comprar, solo recolectar).
-; Escríbelo igual que en la tienda: "Rare Fruit Chest", "Blood Scythe", "Fruit Bag"...
-ARTICULO := "Rare Fruit Chest"
-; true  = compra y se detiene ("1x")   |  false = compra y sigue recolectando ("inf")
-PARAR_TRAS_COMPRAR := false
-; true = gasta todos los caramelos en el artículo | false = compra solo 1 cada vez
-COMPRAR_TODO := true
+; El artículo, el modo de compra, la habilidad y la cámara se eligen en la ventana.
 ; Cuánto tiempo (ms) se mantiene E para tocar una puerta o hablar con la bruja.
 MANTENER_E := 400
 ; Espera (ms) tras tocar una puerta, para que se acabe el aturdimiento.
@@ -28,10 +24,7 @@ ESPERA_TRAS_TOCAR := 1500
 RECARGA_PUERTA := 180
 ; Sensibilidad del giro de cámara al alinear al Norte (bájalo si se pasa de largo).
 FACTOR_GIRO := 0.5
-; Alinear la cámara al Norte antes de cada vuelta.
-ALINEAR_CAMARA := true
 ; Habilidad periódica: saca la fruta (slot 3), usa C y vuelve a la bolsa (slot 2).
-HABILIDAD_CADA_MIN := 5      ; 0 = desactivado
 SLOT_HABILIDAD := "3"
 TECLA_HABILIDAD := "c"
 MANTENER_HABILIDAD := 300    ; ms que se mantiene C
@@ -39,13 +32,17 @@ ESPERA_HABILIDAD := 2500     ; ms de animación antes de volver a la bolsa
 SLOT_BOLSA := "2"
 ; ------------------------------------------------
 
-PRECIOS := Map(
-    "SP Reset Essence", 10, "Devil Fruit Remover", 25, "Race Reroll x5", 25,
-    "Custom Spirit Color", 50, "Lantern", 50, "Trading Sign", 100,
-    "Joker Costume", 100, "Ghost Face Costume", 100, "Plague Doctor Costume", 100,
-    "Legendary Fruit Chest Blueprint", 100, "Mummy Wrappings", 100, "Devil Fruit Journal", 125,
-    "Wizard Costume", 175, "Frankenstein Costume", 175, "Shark Costume", 175,
-    "Fruit Bag", 250, "Rare Fruit Chest", 250, "Blood Scythe", 500)
+; Artículos de la Halloween Shop en el orden de la tienda: [nombre, precio]
+ARTICULOS := [
+    ["SP Reset Essence", 10], ["Devil Fruit Remover", 25], ["Race Reroll x5", 25],
+    ["Custom Spirit Color", 50], ["Lantern", 50], ["Trading Sign", 100],
+    ["Joker Costume", 100], ["Ghost Face Costume", 100], ["Plague Doctor Costume", 100],
+    ["Legendary Fruit Chest Blueprint", 100], ["Mummy Wrappings", 100], ["Devil Fruit Journal", 125],
+    ["Wizard Costume", 175], ["Frankenstein Costume", 175], ["Shark Costume", 175],
+    ["Fruit Bag", 250], ["Rare Fruit Chest", 250], ["Blood Scythe", 500]]
+PRECIOS := Map()
+for a in ARTICULOS
+    PRECIOS[a[1]] := a[2]
 
 ; Nombres que en la tienda ocupan dos líneas o que el OCR puede leer mal.
 CLAVES := Map("Plague Doctor Costume", "plaguedoctor", "Legendary Fruit Chest Blueprint", "legendaryfruitchest",
@@ -55,11 +52,23 @@ ROBLOX := "ahk_exe RobloxPlayerBeta.exe"
 TECLAS := ["w", "a", "s", "d", "Space", "e", "q", "c", "LShift", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 ARCHIVO_RUTA := A_ScriptDir "\ruta.txt"
 ARCHIVO_COMPRA := A_ScriptDir "\compra.txt"
+ARCHIVO_CONFIG := A_ScriptDir "\config.ini"
+
+; Opciones de la ventana (se guardan en config.ini)
+MODO := IniRead(ARCHIVO_CONFIG, "opciones", "modo", "inf")                 ; off | 1x | inf
+ARTICULO_ELEGIDO := IniRead(ARCHIVO_CONFIG, "opciones", "articulo", "Rare Fruit Chest")
+HABILIDAD_MIN := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "habilidad_min", 5))
+HABILIDAD_ACTIVA := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "habilidad", 1))
+ALINEAR_CAMARA := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "camara", 1))
+if !PRECIOS.Has(ARTICULO_ELEGIDO)
+    ARTICULO_ELEGIDO := "Rare Fruit Chest"
+ARTICULO := "", PARAR_TRAS_COMPRAR := false, COMPRAR_TODO := true, HABILIDAD_CADA_MIN := 0
+AplicarOpciones()
 
 ; Zonas de la pantalla (1920x1080, pantalla completa)
 ZONA_CONTADOR := [820, 850, 280, 55]      ; "219/500 Candies"
 ZONA_MENSAJES := [450, 155, 1020, 90]     ; "You got +5 Candies!" / "Come back in 124s" / "basket is full"
-ZONA_KNOCK    := [450, 250, 1250, 500]    ; "E Knock"
+ZONA_KNOCK    := [450, 250, 1000, 500]    ; "E Knock" (hasta x=1450: a la derecha va la ventana)
 ZONA_TITULO_TIENDA := [450, 215, 500, 70] ; "Halloween Shop"
 ZONA_CARAMELOS_TIENDA := [1300, 250, 120, 45] ; "500" arriba a la derecha de la tienda
 ZONA_ITEMS    := [500, 290, 920, 580]     ; tarjetas de la tienda
@@ -83,8 +92,12 @@ listoEn := Map()     ; puerta -> A_TickCount en que vuelve a estar disponible
 teclasJugando := Map()
 compradasUltima := 0
 proximaHabilidad := 0
+vueltas := 0, compras := 0, puertasTocadas := 0
 
-MostrarEstado("Listo - F1 grabar ruta, F3 iniciar, F7 diagnóstico")
+CrearVentana()
+MostrarEstado(FileExist(ARCHIVO_RUTA) ? "Listo. Ponte junto al caldero y pulsa Iniciar."
+    : "Primero graba tu ruta de puertas (botón Grabar ruta o F1).")
+SetTimer TimerContador, 3000
 
 ; ================= LECTURA DE PANTALLA =================
 
@@ -109,8 +122,10 @@ LeerContador() {
     texto := RegExReplace(texto, "[^\d/]")                  ; quita puntos, comas, espacios ("5.00" -> "500")
     if RegExMatch(texto, "(\d+)/(\d+)", &m) {
         a := Integer(m[1]), b := Integer(m[2])
-        if (b > 0 && a <= b)
+        if (b > 0 && a <= b) {
+            MostrarCaramelos(a, b)
             return [a, b]
+        }
     }
     return ""
 }
@@ -182,7 +197,8 @@ TerminarGrabacion() {
         FileDelete archivoGrabando
     FileAppend texto, archivoGrabando
     estado := "parado"
-    MostrarEstado("Guardado: " Round(t / 1000, 1) " s, " puertas " pulsaciones de E")
+    ActualizarRuta()
+    MostrarEstado("Ruta guardada: " Round(t / 1000, 1) " s, " puertas " puertas")
 }
 
 #HotIf estado = "grabando"
@@ -193,13 +209,17 @@ TerminarGrabacion() {
 
 GrabarRaton(tipo) {
     global
-    MouseGetPos &x, &y
+    MouseGetPos &x, &y, &ventana
+    if (ventana = ui.Hwnd)   ; clic en la ventana del macro (p. ej. el botón de terminar)
+        return
     eventos.Push((A_TickCount - inicioGrabacion) "|" tipo "|" x "," y)
 }
 
 ; ================= CONTROLES =================
 
-F3:: {
+F3:: IniciarParar()
+
+IniciarParar() {
     global
     if (estado = "jugando") {
         estado := "parado"
@@ -209,10 +229,6 @@ F3:: {
         return
     if !FileExist(ARCHIVO_RUTA) {
         MsgBox "Primero graba la ruta con F1."
-        return
-    }
-    if (ARTICULO != "" && !PRECIOS.Has(ARTICULO)) {
-        MsgBox "No conozco el artículo '" ARTICULO "'. Revisa cómo está escrito en la CONFIGURACIÓN."
         return
     }
     if !ActivarRoblox()
@@ -246,7 +262,8 @@ ActivarRoblox() {
 
 Bucle() {
     global
-    vueltas := 0, compras := 0
+    vueltas := 0, compras := 0, puertasTocadas := 0
+    ActualizarStats()
     lleno := false
     proximaHabilidad := A_TickCount
     loop {
@@ -266,6 +283,7 @@ Bucle() {
                 return
             }
             compras++
+            ActualizarStats()
             lleno := false
             if PARAR_TRAS_COMPRAR {
                 estado := "parado"
@@ -274,7 +292,7 @@ Bucle() {
             }
         } else if lleno {
             estado := "parado"
-            MostrarEstado("Bolsa llena y no hay ARTICULO configurado - parado")
+            MostrarEstado("Bolsa llena (modo sin compras) - parado")
             return
         }
 
@@ -294,6 +312,7 @@ Bucle() {
         if !Reproducir(ARCHIVO_RUTA, true)
             break
         vueltas++
+        ActualizarStats()
     }
     SoltarTodo()
     estado := "parado"
@@ -434,6 +453,10 @@ TocarPuerta(n) {
         } else if !Esperar(250) {
             return false
         }
+    }
+    if InStr(resultado, "caramelos") {
+        puertasTocadas++
+        ActualizarStats()
     }
     if (resultado = "") {
         resultado := "sin respuesta"
@@ -645,8 +668,10 @@ ConfirmarCompra() {
     r := LeerResultado([0, 0, 1920, 1080], 1)
     if !IsObject(r)
         return
+    ui.GetPos(&gx, &gy, &gw, &gh)
     for w in r.Words
-        if RegExMatch(Trim(w.Text), "i)^(buy|purchase|confirm|yes|redeem|comprar|confirmar)!?$") {
+        if !(w.x >= gx && w.x <= gx + gw && w.y >= gy && w.y <= gy + gh)
+        && RegExMatch(Trim(w.Text), "i)^(buy|purchase|confirm|yes|redeem|comprar|confirmar)!?$") {
             RatonRoblox("click", Round(w.x + w.w / 2), Round(w.y + w.h / 2))
             return
         }
@@ -693,7 +718,9 @@ Desconectado() {
 
 ; ================= DIAGNÓSTICO =================
 
-F7:: {
+F7:: Diagnostico()
+
+Diagnostico() {
     c := LeerContador()
     msg := LeerTexto(ZONA_MENSAJES)
     knock := LeerTexto(ZONA_KNOCK, 1)
@@ -707,6 +734,204 @@ F7:: {
     FileAppend texto "`n", A_ScriptDir "\diagnostico.txt"
     ToolTip texto, 20, 300, 2
     SetTimer () => ToolTip(, , , 2), -8000
+}
+
+; ================= VENTANA =================
+
+COL_FONDO := "17171D", COL_PANEL := "24242E", COL_BOTON := "34343F"
+COL_VERDE := "27AE60", COL_ROJO := "C0392B", COL_NARANJA := "FF8A1F"
+COL_TEXTO := "EDEDF2", COL_GRIS := "9C9CA8"
+
+CrearVentana() {
+    global
+    ui := Gui("+AlwaysOnTop -MaximizeBox", "GPO Halloween")
+    ui.BackColor := COL_FONDO
+    ui.MarginX := 16, ui.MarginY := 12
+    ui.OnEvent("Close", (*) => Salir())
+
+    ui.SetFont("s17 bold c" COL_NARANJA, "Segoe UI")
+    ui.Add("Text", "xm w340", "GPO Halloween")
+    ui.SetFont("s9 norm c" COL_GRIS)
+    ui.Add("Text", "xm y+0 w340", "Macro de caramelos · Spooksville")
+
+    ; --- contador de caramelos
+    ui.SetFont("s24 bold c" COL_TEXTO)
+    txtCaramelos := ui.Add("Text", "xm y+10 w340 Center", "— / —")
+    ui.SetFont("s9 norm c" COL_GRIS)
+    ui.Add("Text", "xm y+0 w340 Center", "caramelos")
+    barra := ui.Add("Progress", "xm y+6 w340 h8 c" COL_NARANJA " Background" COL_PANEL, 0)
+
+    ; --- compras
+    ui.SetFont("s10 bold c" COL_TEXTO)
+    ui.Add("Text", "xm y+16", "Compras")
+    ui.SetFont("s10 norm c" COL_TEXTO)
+    ddlModo := ui.Add("DropDownList", "xm y+6 w340",
+        ["Sin compras (solo recolectar)", "1x · compra una vez y para", "inf · compra todo y sigue"])
+    ddlModo.Value := MODO = "off" ? 1 : MODO = "1x" ? 2 : 3
+    lista := []
+    for a in ARTICULOS {
+        lista.Push(a[1] "   —   " a[2] " caramelos")
+        if (a[1] = ARTICULO_ELEGIDO)
+            elegido := A_Index
+    }
+    ddlArticulo := ui.Add("DropDownList", "xm y+8 w340 R18", lista)
+    ddlArticulo.Value := elegido
+    txtPrecio := ui.Add("Text", "xm y+4 w340 c" COL_GRIS, "")
+
+    ; --- opciones (casilla sin texto + etiqueta, para que el texto se vea en modo oscuro)
+    ui.SetFont("s10 bold c" COL_TEXTO)
+    ui.Add("Text", "xm y+12", "Opciones")
+    ui.SetFont("s10 norm c" COL_TEXTO)
+    chkHab := ui.Add("CheckBox", "xm y+8 w16 h20", "")
+    chkHab.Value := HABILIDAD_ACTIVA
+    lblHab := ui.Add("Text", "x+4 yp+1", "Usar habilidad C (slot 3) cada")
+    edtMin := ui.Add("Edit", "x+6 yp-3 w42 h24 Number Center c" COL_TEXTO " Background" COL_PANEL, HABILIDAD_MIN)
+    ui.Add("UpDown", "Range1-60", HABILIDAD_MIN)
+    ui.Add("Text", "x+6 yp+3", "min")
+    chkCam := ui.Add("CheckBox", "xm y+12 w16 h20", "")
+    chkCam.Value := ALINEAR_CAMARA
+    lblCam := ui.Add("Text", "x+4 yp+1", "Corregir la cámara al Norte en cada vuelta")
+    lblHab.OnEvent("Click", (*) => (chkHab.Value := !chkHab.Value, CambiarOpciones()))
+    lblCam.OnEvent("Click", (*) => (chkCam.Value := !chkCam.Value, CambiarOpciones()))
+
+    ; --- botones
+    btnIniciar := Boton("xm y+18 w340 h42", "s12", "▶   Iniciar   (F3)", COL_VERDE, IniciarParar)
+    btnCompra := Boton("xm y+8 w166 h32", "s9", "Probar compra (F4)", COL_BOTON, () => Lanzar(ProbarCompra))
+    btnRuta := Boton("x+8 yp w166 h32", "s9", "Grabar ruta (F1)", COL_BOTON, () => AlternarGrabacion(ARCHIVO_RUTA, "RUTA"))
+    btnCamara := Boton("xm y+8 w166 h32", "s9", "Probar cámara (F6)", COL_BOTON, () => Lanzar(ProbarCamara))
+    btnDiag := Boton("x+8 yp w166 h32", "s9", "Diagnóstico (F7)", COL_BOTON, () => (ActivarRoblox() && (Sleep(300), Diagnostico())))
+
+    ; --- ruta, estadísticas y estado
+    ui.SetFont("s9 norm c" COL_GRIS)
+    txtRuta := ui.Add("Text", "xm y+12 w340", "")
+    txtStats := ui.Add("Text", "xm y+2 w340", "")
+    ui.SetFont("s10 norm c" COL_VERDE)
+    txtEstado := ui.Add("Text", "xm y+8 w340 h40", "")
+
+    for ctrl in [ddlModo, ddlArticulo]
+        ctrl.OnEvent("Change", CambiarOpciones)
+    for ctrl in [chkHab, chkCam]
+        ctrl.OnEvent("Click", CambiarOpciones)
+    edtMin.OnEvent("Change", CambiarOpciones)
+
+    ; tema oscuro de Windows para la barra de título y las listas
+    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", ui.Hwnd, "Int", 20, "Int*", 1, "Int", 4)
+    for ctrl in [ddlModo, ddlArticulo, edtMin]
+        try DllCall("uxtheme\SetWindowTheme", "Ptr", ctrl.Hwnd, "Str", "DarkMode_CFD", "Ptr", 0)
+
+    ActualizarRuta()
+    ActualizarStats()
+    ActualizarOpcionesVisibles()
+    ; a la derecha de la pantalla, fuera de las zonas que el macro lee
+    ui.Show("x1525 y40 AutoSize NoActivate")
+}
+
+; Botón plano de color (un Text con fondo, como en el video).
+Boton(pos, tam, texto, color, accion) {
+    global
+    ui.SetFont(tam " bold cFFFFFF")
+    b := ui.Add("Text", pos " Center 0x200 Background" color, texto)   ; 0x200 = centrado vertical
+    b.OnEvent("Click", (*) => accion())
+    return b
+}
+
+PintarBoton(b, texto, color) {
+    if (b.Text != texto)
+        b.Text := texto
+    b.Opt("+Background" color)
+    b.Redraw()
+}
+
+ActualizarBotones() {
+    global
+    if !IsSet(btnIniciar)
+        return
+    if (estado = "jugando")
+        PintarBoton(btnIniciar, "■   Parar   (F3)", COL_ROJO)
+    else
+        PintarBoton(btnIniciar, "▶   Iniciar   (F3)", COL_VERDE)
+    if (estado = "grabando" && archivoGrabando = ARCHIVO_RUTA)
+        PintarBoton(btnRuta, "●  Terminar ruta (F1)", COL_ROJO)
+    else
+        PintarBoton(btnRuta, "Grabar ruta (F1)", COL_BOTON)
+}
+
+CambiarOpciones(*) {
+    global
+    MODO := ["off", "1x", "inf"][ddlModo.Value]
+    ARTICULO_ELEGIDO := ARTICULOS[ddlArticulo.Value][1]
+    HABILIDAD_ACTIVA := chkHab.Value
+    HABILIDAD_MIN := Max(1, Integer(edtMin.Value = "" ? 5 : edtMin.Value))
+    ALINEAR_CAMARA := chkCam.Value
+    AplicarOpciones()
+    ActualizarOpcionesVisibles()
+    try {
+        IniWrite MODO, ARCHIVO_CONFIG, "opciones", "modo"
+        IniWrite ARTICULO_ELEGIDO, ARCHIVO_CONFIG, "opciones", "articulo"
+        IniWrite HABILIDAD_MIN, ARCHIVO_CONFIG, "opciones", "habilidad_min"
+        IniWrite HABILIDAD_ACTIVA, ARCHIVO_CONFIG, "opciones", "habilidad"
+        IniWrite ALINEAR_CAMARA, ARCHIVO_CONFIG, "opciones", "camara"
+    }
+}
+
+; Traduce lo elegido en la ventana a lo que usa el macro.
+AplicarOpciones() {
+    global
+    ARTICULO := (MODO = "off") ? "" : ARTICULO_ELEGIDO
+    PARAR_TRAS_COMPRAR := (MODO = "1x")
+    COMPRAR_TODO := (MODO = "inf")
+    HABILIDAD_CADA_MIN := HABILIDAD_ACTIVA ? HABILIDAD_MIN : 0
+}
+
+ActualizarOpcionesVisibles() {
+    global
+    ddlArticulo.Enabled := (MODO != "off")
+    precio := PRECIOS[ARTICULO_ELEGIDO]
+    txtPrecio.Value := (MODO = "off") ? "Al llenar la bolsa, el macro se detiene."
+        : (MODO = "1x") ? "Al llenar la bolsa compra 1 " ARTICULO_ELEGIDO " (" precio ") y se detiene."
+        : "Al llenar la bolsa compra todos los " ARTICULO_ELEGIDO " que pueda (" precio " c/u)."
+}
+
+ActualizarRuta() {
+    global
+    if !FileExist(ARCHIVO_RUTA) {
+        txtRuta.Value := "Ruta: sin grabar"
+        return
+    }
+    n := 0
+    loop parse FileRead(ARCHIVO_RUTA), "`n", "`r"
+        if InStr(A_LoopField, "|kd|e")
+            n++
+    txtRuta.Value := "Ruta: grabada (" n " puertas)"
+}
+
+ActualizarStats() {
+    global
+    if IsSet(txtStats)
+        txtStats.Value := "Vueltas: " vueltas "   ·   Puertas tocadas: " puertasTocadas "   ·   Compras: " compras
+}
+
+MostrarCaramelos(a, b) {
+    global
+    if !IsSet(txtCaramelos)
+        return
+    txt := a " / " b
+    if (txtCaramelos.Value != txt) {
+        txtCaramelos.Value := txt
+        barra.Value := Round(a * 100 / b)
+    }
+}
+
+; Con el macro parado, mantiene el contador al día mientras juegas.
+TimerContador() {
+    global
+    if (estado = "parado" && WinActive(ROBLOX))
+        LeerContador()
+}
+
+Salir() {
+    SoltarTodo()
+    ExitApp
 }
 
 ; ================= UTILIDADES =================
@@ -755,10 +980,9 @@ SoltarTodo() {
 }
 
 MostrarEstado(texto) {
-    ToolTip "GPO Halloween: " texto, 1480, 940
+    global
+    txtEstado.Value := texto
+    ActualizarBotones()
 }
 
-F8:: {
-    SoltarTodo()
-    ExitApp
-}
+F8:: Salir()

@@ -26,6 +26,20 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 - Roblox en **pantalla completa a 1920×1080**.
 - La **bolsa de caramelos equipada**.
 
+## La ventana
+Al abrir el macro aparece una ventana a la derecha de la pantalla, siempre encima del juego:
+- **Contador de caramelos** en vivo, con una barra de progreso.
+- **Compras:** el modo y el artículo de la tienda, en dos listas.
+  - *Sin compras*: solo recolecta y, al llenar la bolsa, se detiene.
+  - *1x*: compra el artículo una vez y se detiene.
+  - *inf*: compra todos los que pueda y sigue recolectando.
+- **Opciones:** usar la habilidad C cada X minutos, y corregir la cámara al Norte.
+- **Botones:** Iniciar/Parar, Probar compra, Grabar ruta, Probar cámara y Diagnóstico.
+- Abajo: la ruta grabada, cuántas vueltas, puertas y compras lleva, y qué está haciendo ahora.
+
+Lo que eliges se guarda en `config.ini` y se recuerda la próxima vez.
+**No pongas la ventana encima del centro de la pantalla:** el macro lee esa zona del juego. Déjala a la derecha.
+
 ## Teclas
 | Tecla | Acción |
 |---|---|
@@ -49,11 +63,8 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
    - Termina **chocando otra vez contra el caldero** y pulsa F1.
    - Chocar contra paredes y esquinas en el camino ayuda a que el personaje no se desvíe.
 4. **Prueba la compra:** junto a la bruja, pulsa **F4**.
-5. Abre el `.ahk` con el Bloc de notas y elige en **CONFIGURACIÓN**:
-   - `ARTICULO`: el artículo, escrito igual que en la tienda (por ejemplo `"Blood Scythe"`). Si lo dejas como `""`, solo recolecta.
-   - `PARAR_TRAS_COMPRAR`: `true` compra y se detiene; `false` sigue en bucle.
-   - `COMPRAR_TODO`: `true` gasta todos los caramelos en el artículo; `false` compra solo uno cada vez.
-6. Vuelve al caldero y pulsa **F3**. Si cambias de ventana, se detiene solo.
+5. En la ventana, elige el **modo** y el **artículo**.
+6. Vuelve al caldero y pulsa **Iniciar** (o F3). Si cambias de ventana, se detiene solo.
 
 ## Si algo falla
 - **No lee el contador o los mensajes:** pulsa F7 en esa situación y mándame `diagnostico.txt` junto con una captura.
