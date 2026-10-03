@@ -15,7 +15,7 @@ Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inye
 - **Cada 5 minutos usa la habilidad C:** saca la fruta (slot 3), pulsa C y vuelve a la bolsa (slot 2).
   Lo hace al empezar y luego en la siguiente parada (una puerta o el caldero), nunca caminando.
   Se ajusta en `HABILIDAD_CADA_MIN`, `SLOT_HABILIDAD`, `TECLA_HABILIDAD` y `ESPERA_HABILIDAD`; con `HABILIDAD_CADA_MIN := 0` se desactiva.
-- **Alinea la cámara al Norte** con la brújula antes de cada vuelta, para que la ruta no se tuerza.
+- **Corrige la cámara al Norte** antes de cada vuelta: busca la "N" blanca de la brújula (`Lib/norte.png`) y la centra. Solo corrige desvíos pequeños; si no ve la N, no gira.
 - Si Roblox se desconecta, pulsa "Reconnect" si aparece y se detiene.
 
 Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macro externo no puede saber en qué coordenadas está tu personaje.
@@ -38,9 +38,9 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 | F8 | Cerrar el macro |
 
 ## Primeros pasos
-1. **Prueba la lectura:** en el juego pulsa **F7**. Debe mostrar tu contador (por ejemplo `219/500`) y las letras de la brújula.
+1. **Prueba la lectura:** mirando al Norte, pulsa **F7** en el juego. Debe mostrar tu contador (por ejemplo `219/500`) y "N en x=…".
    Si dice "NO LEÍDO", mándame el `diagnostico.txt`.
-2. **Prueba la cámara:** gira la cámara a cualquier lado y pulsa **F6**. Debe girar sola hasta que la brújula marque **N** en el centro.
+2. **Prueba la cámara:** gira la cámara **un poco** (la N tiene que seguir cerca del centro) y pulsa **F6**. Debe volver a centrar la N.
    Si se pasa de largo o gira muy lento, cambia `FACTOR_GIRO`.
 3. **Graba la ruta (F1):**
    - Empieza **pegado al caldero de la bruja**, con la cámara en Norte (pulsa F6 antes).

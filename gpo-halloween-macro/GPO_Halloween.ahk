@@ -63,10 +63,13 @@ ZONA_KNOCK    := [450, 250, 1250, 500]    ; "E Knock"
 ZONA_TITULO_TIENDA := [450, 215, 500, 70] ; "Halloween Shop"
 ZONA_CARAMELOS_TIENDA := [1300, 250, 120, 45] ; "500" arriba a la derecha de la tienda
 ZONA_ITEMS    := [500, 290, 920, 580]     ; tarjetas de la tienda
-ZONA_BRUJULA  := [500, 5, 920, 50]        ; N / NE / E ...
+; La letra del centro de la brújula es blanca pura; se busca la "N" como imagen.
+IMG_NORTE := A_ScriptDir "\Lib\norte.png"   ; 17x21, fondo magenta = transparente
+NORTE_W := 17, NORTE_H := 21
 
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
+CoordMode "Pixel", "Screen"
 SetKeyDelay 10, 30   ; Roblox ignora pulsaciones demasiado rápidas
 
 estado := "parado"   ; parado | grabando | jugando
@@ -99,7 +102,11 @@ LeerResultado(zona, escala := 1) {
 
 ; Devuelve [actuales, máximo] o "" si no se pudo leer.
 LeerContador() {
-    texto := StrReplace(LeerTexto(ZONA_CONTADOR), " ")
+    texto := LeerTexto(ZONA_CONTADOR)
+    texto := RegExReplace(texto, "i)c\s*a\s*n.*$")        ; quita "Candies"
+    texto := RegExReplace(texto, "[oO]", "0")
+    texto := RegExReplace(texto, "[lI|]", "1")
+    texto := RegExReplace(texto, "[^\d/]")                  ; quita puntos, comas, espacios ("5.00" -> "500")
     if RegExMatch(texto, "(\d+)/(\d+)", &m) {
         a := Integer(m[1]), b := Integer(m[2])
         if (b > 0 && a <= b)
@@ -459,40 +466,56 @@ HabilidadSiToca() {
 
 ; ================= CÁMARA =================
 
-; Gira la cámara (clic derecho + movimiento del ratón) hasta que la brújula marca N en el centro.
+; x del centro de la "N" de la brújula si está cerca del centro de la pantalla; "" si no.
+BuscarNorte() {
+    global
+    if !FileExist(IMG_NORTE)
+        return ""
+    try {
+        if !ImageSearch(&fx, &fy, 760, 5, 1160, 60, "*70 *TransFF00FF " IMG_NORTE)
+            return ""
+    } catch
+        return ""
+    ; descarta "NE" / "NW": no debe haber otra letra blanca pegada a la N
+    if PixelSearch(&px, &py, fx + NORTE_W + 1, fy + 4, fx + NORTE_W + 20, fy + NORTE_H - 4, 0xFFFFFF, 40)
+        return ""
+    if PixelSearch(&px, &py, fx - 20, fy + 4, fx - 1, fy + NORTE_H - 4, 0xFFFFFF, 40)
+        return ""
+    return fx + NORTE_W // 2
+}
+
+; Corrige la cámara hasta que la N quede en el centro de la brújula.
+; Solo corrige desvíos pequeños: si no ve la N, no gira (empieza siempre mirando al Norte).
 AlinearCamara() {
     global
-    MostrarEstado("Alineando la cámara al Norte")
     factor := FACTOR_GIRO
-    ultimoSigno := 0
-    loop 25 {
+    ultimoPaso := 0
+    loop 15 {
         if !SeguirJugando()
             return false
-        r := LeerResultado(ZONA_BRUJULA, 2)
-        cx := ""
-        if IsObject(r)
-            for w in r.Words
-                if (Trim(w.Text) = "N") {
-                    cx := w.x + w.w / 2
-                    break
-                }
+        cx := BuscarNorte()
         if (cx = "") {
-            GirarCamara(250)   ; el Norte no está a la vista: gira un buen trozo
+            if (ultimoPaso = 0) {
+                MostrarEstado("No veo la N de la brújula - no alineo la cámara")
+                return true
+            }
+            GirarCamara(-ultimoPaso)   ; se pasó: deshace el último giro y prueba más fino
+            factor /= 2
+            ultimoPaso := 0
             continue
         }
         dif := cx - 960
-        if (Abs(dif) <= 15)
+        if (Abs(dif) <= 8)
             return true
-        signo := dif > 0 ? 1 : -1
-        if (ultimoSigno && signo != ultimoSigno)
-            factor /= 2        ; se pasó de largo: gira más fino
-        ultimoSigno := signo
+        MostrarEstado("Alineando la cámara al Norte")
         paso := Round(dif * factor)
         if (Abs(paso) < 2)
-            paso := 2 * signo
-        GirarCamara(Max(-400, Min(400, paso)))
+            paso := dif > 0 ? 2 : -2
+        if (ultimoPaso && (paso > 0) != (ultimoPaso > 0))
+            factor /= 2
+        ultimoPaso := Max(-200, Min(200, paso))
+        GirarCamara(ultimoPaso)
     }
-    MostrarEstado("No pude alinear la cámara (sigo igual)")
     return true
 }
 
@@ -674,16 +697,12 @@ F7:: {
     c := LeerContador()
     msg := LeerTexto(ZONA_MENSAJES)
     knock := LeerTexto(ZONA_KNOCK, 1)
-    r := LeerResultado(ZONA_BRUJULA, 2)
-    brujula := ""
-    if IsObject(r)
-        for w in r.Words
-            brujula .= w.Text "@" (w.x + w.w // 2) " "
+    norte := BuscarNorte()
     texto := "Contador: " (c = "" ? "NO LEÍDO (" LeerTexto(ZONA_CONTADOR) ")" : c[1] "/" c[2])
         . "`nMensajes: " StrReplace(msg, "`n", " | ")
         . "`n'Knock' visible: " (RegExMatch(knock, "i)kn[o0]ck") ? "sí" : "no")
         . "`nTienda abierta: " (TiendaAbierta() ? "sí (" LeerCaramelosTienda() " caramelos)" : "no")
-        . "`nBrújula (letra@x, centro=960): " brujula
+        . "`nBrújula: " (norte = "" ? "no veo la N en el centro" : "N en x=" norte " (centro = 960)")
     try FileDelete A_ScriptDir "\diagnostico.txt"
     FileAppend texto "`n", A_ScriptDir "\diagnostico.txt"
     ToolTip texto, 20, 300, 2
