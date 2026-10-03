@@ -1,38 +1,60 @@
 # Macro GPO Halloween (AutoHotkey v2)
 
-Macro para recolectar caramelos tocando puertas en Spooksville y canjearlos con la bruja.
-Funciona **grabando** lo que haces una vez y **repitiéndolo** en bucle. Solo simula teclado y ratón.
+Macro automático para recolectar caramelos en Spooksville y canjearlos con la bruja.
+Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inyecta nada en el juego.
 
 > Usar macros en GPO puede costarte un baneo. Si no quieres arriesgar tu cuenta principal, úsalo en una secundaria.
 
+## Qué hace solo
+- Toca cada puerta de tu ruta con E y lee el resultado:
+  - **+5 caramelos**: anota que esa puerta tarda en recargar.
+  - **"You already visited… Come back in 124s"**: anota esos 124 s y no la vuelve a tocar hasta que pasen.
+- Lee el contador **"X/500 Candies"**. Cuando la bolsa está llena (o sale *"Your candy basket is full!"*), deja de tocar puertas y termina la vuelta hasta la bruja.
+- **Compra solo:** abre la Halloween Shop, hace scroll hasta el artículo, lo compra (todas las veces que alcancen los caramelos) y cierra la tienda.
+- Si todas las puertas están en recarga, espera junto a la bruja.
+- **Alinea la cámara al Norte** con la brújula antes de cada vuelta, para que la ruta no se tuerza.
+- Si Roblox se desconecta, pulsa "Reconnect" si aparece y se detiene.
+
+Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macro externo no puede saber en qué coordenadas está tu personaje.
+
 ## Requisitos
-- Windows y **AutoHotkey v2** (https://www.autohotkey.com).
-- Roblox en **pantalla completa a 1920×1080**, siempre igual que cuando grabaste.
-- La **bolsa de caramelos equipada** (ranura 2).
+- Windows 10/11 y **AutoHotkey v2** (https://www.autohotkey.com).
+- La carpeta completa: `GPO_Halloween.ahk` **y la carpeta `Lib`** (dentro va `OCR.ahk`, el lector de pantalla).
+- Roblox en **pantalla completa a 1920×1080**.
+- La **bolsa de caramelos equipada**.
 
 ## Teclas
 | Tecla | Acción |
 |---|---|
-| F1 | Empezar / terminar la grabación de la **ruta** de puertas |
-| F2 | Empezar / terminar la grabación de la **compra** con la bruja |
-| F3 | Iniciar / parar el macro |
-| F4 | Probar solo la compra |
+| F1 | Grabar / terminar la **ruta** de puertas |
+| F2 | Grabar / terminar una compra manual (plan B, solo si la compra automática falla) |
+| F3 | Iniciar / parar |
+| F4 | Probar solo la compra (ponte junto a la bruja) |
+| F6 | Probar el alineado de cámara al Norte |
+| F7 | Diagnóstico: muestra qué lee de la pantalla y lo guarda en `diagnostico.txt` |
 | F8 | Cerrar el macro |
 
-## Cómo usarlo
-1. Guarda `GPO_Halloween.ahk` en una carpeta y dale doble clic.
-2. **Punto de inicio fijo:** ponte pegado al caldero de la bruja y gira la cámara hasta que la brújula de arriba marque **N** en el centro.
-   La ruta y la compra deben empezar **siempre** así.
-3. **Graba la ruta (F1):** camina con WASD hasta cada puerta, mantén **E** para tocar (Knock) y sigue con la siguiente.
-   Al final **vuelve a chocar contra el caldero** y pulsa F1 otra vez.
-   - **No muevas la cámara** (clic derecho) mientras grabas.
-   - Chocar contra paredes o esquinas en el camino ayuda a que el personaje no se desvíe con cada vuelta.
-4. **Graba la compra (F2):** desde el caldero, pulsa E para abrir la tienda, haz scroll y clic en el artículo, confirma, cierra la tienda y pulsa F2.
-   Pruébala con **F4**.
-5. Abre el archivo con el Bloc de notas y ajusta la **CONFIGURACIÓN** de arriba:
-   - `COMPRAR_CADA_VUELTAS`: mira cuántos caramelos ganas por vuelta (cada puerta da +5) y divide 500 entre ese número.
-   - `PARAR_TRAS_COMPRAR`: `true` = compra una vez y se detiene; `false` = sigue en bucle.
-6. Vuelve al punto de inicio y pulsa **F3**.
+## Primeros pasos
+1. **Prueba la lectura:** en el juego pulsa **F7**. Debe mostrar tu contador (por ejemplo `219/500`) y las letras de la brújula.
+   Si dice "NO LEÍDO", mándame el `diagnostico.txt`.
+2. **Prueba la cámara:** gira la cámara a cualquier lado y pulsa **F6**. Debe girar sola hasta que la brújula marque **N** en el centro.
+   Si se pasa de largo o gira muy lento, cambia `FACTOR_GIRO`.
+3. **Graba la ruta (F1):**
+   - Empieza **pegado al caldero de la bruja**, con la cámara en Norte (pulsa F6 antes).
+   - Camina a cada puerta y pulsa **E** delante de ella (cada E es una puerta).
+   - **No muevas la cámara** mientras grabas.
+   - Termina **chocando otra vez contra el caldero** y pulsa F1.
+   - Chocar contra paredes y esquinas en el camino ayuda a que el personaje no se desvíe.
+4. **Prueba la compra:** junto a la bruja, pulsa **F4**.
+5. Abre el `.ahk` con el Bloc de notas y elige en **CONFIGURACIÓN**:
+   - `ARTICULO`: el artículo, escrito igual que en la tienda (por ejemplo `"Blood Scythe"`). Si lo dejas como `""`, solo recolecta.
+   - `PARAR_TRAS_COMPRAR`: `true` compra y se detiene; `false` sigue en bucle.
+   - `COMPRAR_TODO`: `true` gasta todos los caramelos en el artículo; `false` compra solo uno cada vez.
+6. Vuelve al caldero y pulsa **F3**. Si cambias de ventana, se detiene solo.
 
-Si cambias a otra ventana, el macro se detiene solo y suelta todas las teclas.
-Si con las vueltas el personaje se va desviando, vuelve a grabar la ruta con más choques contra paredes, o más corta.
+## Si algo falla
+- **No lee el contador o los mensajes:** pulsa F7 en esa situación y mándame `diagnostico.txt` junto con una captura.
+- **No encuentra el artículo o no confirma la compra:** mándame una captura justo después de hacer clic en el artículo.
+- **El personaje se desvía con las vueltas:** graba una ruta más corta o con más choques contra paredes.
+
+Créditos: lectura de pantalla con [OCR de Descolada](https://github.com/Descolada/OCR) (licencia MIT, `Lib/OCR-LICENSE.txt`).
