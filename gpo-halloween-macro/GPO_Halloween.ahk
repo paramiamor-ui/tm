@@ -76,6 +76,11 @@ ZONA_ITEMS    := [500, 290, 920, 580]     ; tarjetas de la tienda
 IMG_NORTE := A_ScriptDir "\Lib\norte.png"   ; 17x21, fondo magenta = transparente
 NORTE_W := 17, NORTE_H := 21
 
+; Colores de la ventana
+COL_FONDO := "17171D", COL_PANEL := "24242E", COL_BOTON := "34343F"
+COL_VERDE := "27AE60", COL_ROJO := "C0392B", COL_NARANJA := "FF8A1F"
+COL_TEXTO := "EDEDF2", COL_GRIS := "9C9CA8"
+
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
 CoordMode "Pixel", "Screen"
@@ -737,10 +742,6 @@ Diagnostico() {
 }
 
 ; ================= VENTANA =================
-
-COL_FONDO := "17171D", COL_PANEL := "24242E", COL_BOTON := "34343F"
-COL_VERDE := "27AE60", COL_ROJO := "C0392B", COL_NARANJA := "FF8A1F"
-COL_TEXTO := "EDEDF2", COL_GRIS := "9C9CA8"
 
 CrearVentana() {
     global
