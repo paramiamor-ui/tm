@@ -154,6 +154,7 @@ F2:: AlternarGrabacion(ARCHIVO_COMPRA, "COMPRA")
 
 AlternarGrabacion(archivo, nombre) {
     global
+    local k
     if (estado = "grabando") {
         if (archivo = archivoGrabando)
             TerminarGrabacion()
@@ -177,6 +178,7 @@ AlternarGrabacion(archivo, nombre) {
 
 GrabarTecla(tipo, hook, vk, sc) {
     global
+    local nombre
     nombre := GetKeyName(Format("vk{:x}sc{:x}", vk, sc))
     if (tipo = "kd") {
         if pulsadas.Has(nombre)   ; ignora la auto-repetición al mantener la tecla
@@ -192,6 +194,7 @@ GrabarTecla(tipo, hook, vk, sc) {
 
 TerminarGrabacion() {
     global
+    local linea, nombre, puertas, t, texto
     ih.Stop()
     t := A_TickCount - inicioGrabacion
     for nombre in pulsadas
@@ -219,6 +222,7 @@ TerminarGrabacion() {
 
 GrabarRaton(tipo) {
     global
+    local ventana, x, y
     MouseGetPos &x, &y, &ventana
     if (ventana = ui.Hwnd || ventana = uiMini.Hwnd)   ; clic en la ventana del macro
         return
@@ -276,6 +280,7 @@ ActivarRoblox() {
 
 Bucle() {
     global
+    local c, espera
     vueltas := 0, compras := 0, puertasTocadas := 0
     ActualizarStats()
     lleno := false
@@ -336,6 +341,7 @@ Bucle() {
 ; ms hasta que la primera puerta conocida vuelva a estar disponible (0 si alguna ya lo está).
 EsperaMinima() {
     global
+    local minimo, resto, total
     if !FileExist(ARCHIVO_RUTA)
         return 0
     total := 0
@@ -360,6 +366,7 @@ EsperaMinima() {
 ; TocarPuerta(n). Devuelve false si se paró (F3 o Roblox perdió el foco).
 Reproducir(archivo, conPuertas := false) {
     global
+    local antes, base, k, linea, lineas, p, puerta, t, xy
     lineas := StrSplit(Trim(FileRead(archivo), "`r`n"), "`n", "`r")
     base := A_TickCount
     puerta := 0
@@ -411,6 +418,7 @@ Reproducir(archivo, conPuertas := false) {
 
 TocarPuerta(n) {
     global
+    local antes, c, dif, fin, m, m2, msg, msgAntes, pos, resultado, visto
     if !HabilidadSiToca()
         return false
     if lleno {
@@ -506,6 +514,7 @@ HabilidadSiToca() {
 ; x del centro de la "N" de la brújula si está cerca del centro de la pantalla; "" si no.
 BuscarNorte() {
     global
+    local fx, fy, px, py
     if !FileExist(IMG_NORTE)
         return ""
     try {
@@ -525,6 +534,7 @@ BuscarNorte() {
 ; Solo corrige desvíos pequeños: si no ve la N, no gira (empieza siempre mirando al Norte).
 AlinearCamara() {
     global
+    local cx, dif, factor, paso, ultimoPaso
     factor := FACTOR_GIRO
     ultimoPaso := 0
     loop 15 {
@@ -573,6 +583,7 @@ GirarCamara(dx) {
 
 ProbarCamara() {
     global
+    local ok
     ok := AlinearCamara()
     estado := "parado"
     MostrarEstado(ok ? "Prueba de cámara terminada" : "Prueba de cámara cancelada")
@@ -583,6 +594,7 @@ ProbarCamara() {
 ; La ruta termina pegado a la bruja, así que se compra desde ahí.
 Comprar() {
     global
+    local abierta, caramelos, compradas, despues, fallos, fin, pos, precio
     compradasUltima := 0
     if (ARTICULO = "")
         return true
@@ -649,6 +661,7 @@ Comprar() {
 ; Busca la tarjeta del artículo; hace scroll por la lista si no está a la vista.
 BuscarArticulo() {
     global
+    local corto, linea, nombre, objetivo, r
     nombre := StrLower(StrReplace(ARTICULO, " "))
     corto := CLAVES.Has(ARTICULO) ? CLAVES[ARTICULO] : nombre
     MouseMove 960, 600, 0
@@ -708,6 +721,7 @@ CerrarTienda() {
 
 ProbarCompra() {
     global
+    local ok
     ok := Comprar()
     estado := "parado"
     MostrarEstado(ok ? "Prueba de compra terminada" : "Prueba de compra cancelada")
@@ -717,6 +731,7 @@ ProbarCompra() {
 
 Desconectado() {
     global
+    local r, w
     r := LeerResultado([460, 300, 1000, 480], 1)
     if (!IsObject(r) || !RegExMatch(r.Text, "i)disconnect|lost connection|reconnect"))
         return false
@@ -754,6 +769,7 @@ Diagnostico() {
 
 CrearVentana() {
     global
+    local a, ctrl, fondo, i, lbl, lh, ly, m, nom, pre, x, y, y0
     ui := Gui("-Caption +AlwaysOnTop", "GPO Halloween")
     ui.BackColor := C_NOCHE
     ui.MarginX := 14, ui.MarginY := 12
@@ -907,6 +923,7 @@ ArrastrarVentana(wParam, lParam, msg, hwnd) {
 
 Compactar(*) {
     global
+    local x, y
     if modoMini
         return
     ui.GetPos(&x, &y)
@@ -918,6 +935,7 @@ Compactar(*) {
 
 Expandir(*) {
     global
+    local x, y
     if !modoMini
         return
     uiMini.GetPos(&x, &y)
@@ -937,6 +955,7 @@ GuardarPosicion(x, y) {
 ; Botones y punto de estado según lo que esté haciendo el macro.
 PintarEstado() {
     global
+    local clave
     if !IsSet(miniIniciar)
         return
     clave := estado (estado = "grabando" ? archivoGrabando : "")
@@ -1016,6 +1035,7 @@ AplicarOpciones() {
 
 RefrescarOpciones() {
     global
+    local b, m, precio
     for m, b in btnModo
         Pintar(b, m = MODO ? C_CALABAZA : C_TEJA, m = MODO ? C_NOCHE : C_HUESO)
     precio := PRECIOS[ARTICULO_ELEGIDO]
@@ -1031,6 +1051,7 @@ RefrescarOpciones() {
 ; Pinta las fichas: la elegida en calabaza; el precio en verde si te alcanza, con cuántas.
 RefrescarFichas() {
     global
+    local a, alcanza, cNom, cPre, elegida, f, fondo, i, textoPrecio
     for i, f in fichas {
         a := ARTICULOS[i]
         elegida := (a[1] = ARTICULO_ELEGIDO)
@@ -1050,6 +1071,7 @@ RefrescarFichas() {
 
 ActualizarRuta() {
     global
+    local n
     if !FileExist(ARCHIVO_RUTA) {
         txtRuta.Value := "Ruta sin grabar: ponte en el caldero y pulsa Grabar ruta."
         return
@@ -1092,6 +1114,7 @@ TimerContador() {
 
 Salir(*) {
     global
+    local g, x, y
     try {
         g := modoMini ? uiMini : ui
         g.GetPos(&x, &y)
@@ -1141,6 +1164,7 @@ SeguirJugando() {
 
 SoltarTodo() {
     global
+    local k
     for k in TECLAS
         SendEvent "{" k " up}"
     SendEvent "{RButton up}"
