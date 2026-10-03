@@ -217,6 +217,8 @@ TerminarGrabacion() {
         FileDelete archivoGrabando
     FileAppend texto, archivoGrabando
     estado := "parado"
+    if (archivoGrabando = ARCHIVO_RUTA)
+        listoEn := Map()   ; las puertas de la ruta anterior ya no son las mismas
     ActualizarRuta()
     MostrarEstado("Ruta guardada: " Round(t / 1000, 1) " s, " puertas " puertas")
 }
@@ -396,12 +398,12 @@ LeerRuta(archivo) => StrSplit(Trim(FileRead(archivo), "`r`n"), "`n", "`r")
 ; TocarPuerta(n). Devuelve false si se paró (F3 o Roblox perdió el foco).
 Reproducir(archivo, conPuertas := false) {
     global
-    local antes, armado, base, i, k, linea, lineas, p, proximoEscaneo, puertas, t, tUltimoToque, xy
+    local antes, armado, base, busquedas, i, k, linea, lineas, p, proximoEscaneo, puertas, t, tUltimoToque, vistos, xy
     lineas := LeerRuta(archivo)
     puertas := PuertasDeRuta(lineas)
     base := A_TickCount
     teclasJugando := Map()
-    armado := true, tUltimoToque := -100000, proximoEscaneo := 0
+    armado := true, tUltimoToque := -100000, proximoEscaneo := 0, busquedas := 0, vistos := 0
     for i, linea in lineas {
         if (linea = "")
             continue
@@ -420,22 +422,27 @@ Reproducir(archivo, conPuertas := false) {
             if (conPuertas && BUSCAR_PUERTAS && !lleno && A_TickCount >= proximoEscaneo
                 && t - (A_TickCount - base) > 150) {
                 proximoEscaneo := A_TickCount + 100
-                if !KnockVisible() {
+                busquedas++
+                ; cada 4 búsquedas, si la próxima tecla no está cerca, también lee el texto
+                if (KnockVisible(Mod(busquedas, 4) = 0 && t - (A_TickCount - base) > 400) = "") {
                     armado := true
-                } else if (armado || (A_TickCount - base) - tUltimoToque > REARME_MS) {
-                    antes := A_TickCount
-                    for k in teclasJugando
-                        SendEvent "{" k " up}"
-                    if !TocarPuerta("") {
-                        SoltarTodo()
-                        return false
+                } else {
+                    vistos++
+                    if (armado || (A_TickCount - base) - tUltimoToque > REARME_MS) {
+                        antes := A_TickCount
+                        for k in teclasJugando
+                            SendEvent "{" k " up}"
+                        if !TocarPuerta("") {
+                            SoltarTodo()
+                            return false
+                        }
+                        for k in teclasJugando
+                            SendEvent "{" k " down}"
+                        base += A_TickCount - antes
+                        tUltimoToque := A_TickCount - base
+                        armado := false
+                        continue
                     }
-                    for k in teclasJugando
-                        SendEvent "{" k " down}"
-                    base += A_TickCount - antes
-                    tUltimoToque := A_TickCount - base
-                    armado := false
-                    continue
                 }
             }
             Sleep 5
@@ -472,6 +479,8 @@ Reproducir(archivo, conPuertas := false) {
         }
     }
     SoltarTodo()
+    if conPuertas
+        Registrar("Fin de la ruta: " busquedas " búsquedas del aviso 'E Knock', visto " vistos " veces")
     return SeguirJugando()
 }
 
@@ -493,8 +502,8 @@ TocarPuerta(n) {
     }
     if !EquiparSlot(SLOT_BOLSA)
         return false
-    visto := KnockVisible()
-    MostrarEstado(etiqueta (visto ? " - tocando" : " - no veo 'Knock', intento igual"))
+    visto := KnockVisible(true)
+    MostrarEstado(etiqueta (visto != "" ? " - tocando (aviso visto por " visto ")" : " - no veo 'Knock', intento igual"))
     antes := LeerContador()
     msgAntes := LeerTexto(ZONA_MENSAJES)
     SendEvent "{e down}"
@@ -559,8 +568,18 @@ MarcarRecarga(n, segundos) {
         listoEn[n] := A_TickCount + segundos * 1000
 }
 
-; ¿Está en pantalla el aviso "E Knock" de una puerta? (búsqueda por imagen, rápida)
-KnockVisible() {
+; ¿Está en pantalla el aviso "E Knock" de una puerta? Primero por imagen (rápido);
+; con conTexto, si la imagen no lo encuentra, también leyendo el texto "Knock" (más lento).
+KnockVisible(conTexto := false) {
+    global
+    if KnockPorImagen()
+        return "imagen"
+    if conTexto && RegExMatch(LeerTexto(ZONA_KNOCK, 1), "i)kn[o0]ck")
+        return "texto"
+    return ""
+}
+
+KnockPorImagen() {
     global
     local c, fx, fy, pt
     try {
@@ -879,7 +898,7 @@ Diagnostico() {
             slot .= A_Index " "
     texto := "Contador: " (c = "" ? "NO LEÍDO (" LeerTexto(ZONA_CONTADOR) ")" : c[1] "/" c[2])
         . "`nMensajes: " StrReplace(msg, "`n", " | ")
-        . "`n'Knock' visible: " (KnockVisible() ? "sí" : "no")
+        . "`n'Knock' visible: " ((v := KnockVisible(true)) != "" ? "sí (por " v ")" : "no")
         . "`nTienda abierta: " (TiendaAbierta() ? "sí (" LeerCaramelosTienda() " caramelos)" : "no")
         . "`nBrújula: " (norte = "" ? "no veo la N en el centro" : "N en x=" norte)
         . " (ruta grabada con N en x=" IniRead(ARCHIVO_CONFIG, "ruta", "norte_x", "?") ")"
