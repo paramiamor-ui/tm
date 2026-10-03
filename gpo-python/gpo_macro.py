@@ -63,6 +63,9 @@ CLAVES = {"Plague Doctor Costume": "plaguedoctor",
 
 # Teclas de movimiento que se graban, por código de escaneo (no depende del idioma del teclado)
 SCAN_MOVIMIENTO = {17: "w", 30: "a", 31: "s", 32: "d", 57: "space", 42: "shift"}
+# Teclas de función, por código de escaneo. Se leen a mano (no con add_hotkey) para que
+# funcionen aunque haya otra tecla pulsada, p. ej. F2 mientras empujas con W.
+SCAN_F = {59: "f1", 60: "f2", 61: "f3", 62: "f4", 64: "f6", 65: "f7", 66: "f8"}
 
 
 # ======================= utilidades =======================
@@ -266,6 +269,7 @@ class Macro:
         self.t_segmento = 0.0
         self.pared_actual = False
         self.norte_grabado = None
+        self.f_pulsadas = set()
 
     # ---------- control ----------
     def sigue(self):
@@ -624,7 +628,10 @@ class Macro:
         self.pared_actual = False
 
     def evento_tecla(self, ev):
-        """Recibe todas las teclas físicas (librería keyboard) mientras se graba."""
+        """Recibe todas las teclas físicas (librería keyboard)."""
+        if ev.scan_code in SCAN_F:
+            self.tecla_funcion(ev)
+            return
         if not self.grabando or ev.scan_code not in SCAN_MOVIMIENTO:
             return
         tecla = SCAN_MOVIMIENTO[ev.scan_code]
@@ -636,6 +643,33 @@ class Macro:
         if nuevas != self.teclas_grabando:
             self._cerrar_segmento()
             self.teclas_grabando = nuevas
+
+    def tecla_funcion(self, ev):
+        nombre = SCAN_F[ev.scan_code]
+        if ev.event_type != "down":
+            self.f_pulsadas.discard(nombre)
+            return
+        if nombre in self.f_pulsadas:      # auto-repetición al mantenerla
+            return
+        self.f_pulsadas.add(nombre)
+        if nombre == "f2":
+            self.marcar_pared()            # inmediato, para que quede en el tramo correcto
+            return
+        accion = {
+            "f1": self.alternar_grabacion,
+            "f3": self.iniciar_parar,
+            "f4": lambda: self.lanzar(self.probar_compra),
+            "f6": lambda: self.lanzar(self.probar_camara),
+            "f7": self.diagnostico,
+            "f8": self.salir,
+        }[nombre]
+        # en otro hilo, para no frenar la lectura del teclado
+        threading.Thread(target=accion, daemon=True).start()
+
+    def salir(self):
+        self.activo.clear()
+        soltar_todo()
+        estados.put(("salir", None))
 
     def marcar_pared(self):
         if not self.grabando:
@@ -727,18 +761,6 @@ def main():
         return
     macro = Macro()
     keyboard.hook(macro.evento_tecla)
-    keyboard.add_hotkey("f1", macro.alternar_grabacion)
-    keyboard.add_hotkey("f2", macro.marcar_pared)
-    keyboard.add_hotkey("f3", macro.iniciar_parar)
-    keyboard.add_hotkey("f4", lambda: macro.lanzar(macro.probar_compra))
-    keyboard.add_hotkey("f6", lambda: macro.lanzar(macro.probar_camara))
-    keyboard.add_hotkey("f7", macro.diagnostico)
-
-    def salir():
-        macro.activo.clear()
-        soltar_todo()
-        estados.put(("salir", None))
-    keyboard.add_hotkey("f8", salir)
 
     try:
         os.remove(ARCHIVO_REGISTRO)
