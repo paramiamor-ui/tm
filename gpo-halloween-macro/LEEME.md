@@ -27,17 +27,24 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 - La **bolsa de caramelos equipada**.
 
 ## La ventana
-Al abrir el macro aparece una ventana a la derecha de la pantalla, siempre encima del juego:
-- **Contador de caramelos** en vivo, con una barra de progreso.
-- **Compras:** el modo y el artículo de la tienda, en dos listas.
-  - *Sin compras*: solo recolecta y, al llenar la bolsa, se detiene.
-  - *1x*: compra el artículo una vez y se detiene.
-  - *inf*: compra todos los que pueda y sigue recolectando.
-- **Opciones:** usar la habilidad C cada X minutos, y corregir la cámara al Norte.
-- **Botones:** Iniciar/Parar, Probar compra, Grabar ruta, Probar cámara y Diagnóstico.
-- Abajo: la ruta grabada, cuántas vueltas, puertas y compras lleva, y qué está haciendo ahora.
+![Vista previa](vista-previa.png)
 
-Lo que eliges se guarda en `config.ini` y se recuerda la próxima vez.
+*(Vista previa hecha con una maqueta; en Windows las letras pueden verse un poco distintas.)*
+
+- **Caramelos en la bolsa**, en grande, con una barra que se va llenando.
+- **Al llenar la bolsa:** *Solo parar*, *Comprar 1* (y para) o *Comprar todo* (y sigue).
+- **Artículo de la tienda:** pulsa una ficha para elegirla (queda en naranja). El número en verde (`×2`) es **cuántas te alcanzan** con los caramelos que llevas.
+- **Habilidad C:** − / + cambia cada cuántos minutos; ON/OFF la activa o la desactiva.
+- **Corregir la cámara al Norte:** ON/OFF.
+- **Iniciar** (verde) / **Parar** (rojo), y botones para grabar la ruta, probar la compra, probar la cámara y ver el diagnóstico.
+- Abajo: vueltas, puertas tocadas, compras y qué está haciendo ahora.
+
+**Comodidad:**
+- Arrastra la ventana desde cualquier parte que no sea un botón.
+- **–** o **Esc** la reducen a una barra pequeña; **+** la vuelve a abrir.
+- Al pulsar **Iniciar** se reduce sola a la barra pequeña, para no tapar el juego, y al parar se vuelve a abrir.
+- Recuerda su posición y tus opciones (en `config.ini`).
+
 **No pongas la ventana encima del centro de la pantalla:** el macro lee esa zona del juego. Déjala a la derecha.
 
 ## Teclas

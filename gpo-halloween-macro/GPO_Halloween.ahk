@@ -32,14 +32,14 @@ ESPERA_HABILIDAD := 2500     ; ms de animación antes de volver a la bolsa
 SLOT_BOLSA := "2"
 ; ------------------------------------------------
 
-; Artículos de la Halloween Shop en el orden de la tienda: [nombre, precio]
+; Artículos de la Halloween Shop en el orden de la tienda: [nombre, precio, nombre corto]
 ARTICULOS := [
-    ["SP Reset Essence", 10], ["Devil Fruit Remover", 25], ["Race Reroll x5", 25],
-    ["Custom Spirit Color", 50], ["Lantern", 50], ["Trading Sign", 100],
-    ["Joker Costume", 100], ["Ghost Face Costume", 100], ["Plague Doctor Costume", 100],
-    ["Legendary Fruit Chest Blueprint", 100], ["Mummy Wrappings", 100], ["Devil Fruit Journal", 125],
-    ["Wizard Costume", 175], ["Frankenstein Costume", 175], ["Shark Costume", 175],
-    ["Fruit Bag", 250], ["Rare Fruit Chest", 250], ["Blood Scythe", 500]]
+    ["SP Reset Essence", 10, "SP Reset"], ["Devil Fruit Remover", 25, "Fruit Remover"], ["Race Reroll x5", 25, "Race Reroll x5"],
+    ["Custom Spirit Color", 50, "Spirit Color"], ["Lantern", 50, "Lantern"], ["Trading Sign", 100, "Trading Sign"],
+    ["Joker Costume", 100, "Joker"], ["Ghost Face Costume", 100, "Ghost Face"], ["Plague Doctor Costume", 100, "Plague Doctor"],
+    ["Legendary Fruit Chest Blueprint", 100, "Legendary BP"], ["Mummy Wrappings", 100, "Mummy"], ["Devil Fruit Journal", 125, "Fruit Journal"],
+    ["Wizard Costume", 175, "Wizard"], ["Frankenstein Costume", 175, "Frankenstein"], ["Shark Costume", 175, "Shark"],
+    ["Fruit Bag", 250, "Fruit Bag"], ["Rare Fruit Chest", 250, "Rare Chest"], ["Blood Scythe", 500, "Blood Scythe"]]
 PRECIOS := Map()
 for a in ARTICULOS
     PRECIOS[a[1]] := a[2]
@@ -76,10 +76,11 @@ ZONA_ITEMS    := [500, 290, 920, 580]     ; tarjetas de la tienda
 IMG_NORTE := A_ScriptDir "\Lib\norte.png"   ; 17x21, fondo magenta = transparente
 NORTE_W := 17, NORTE_H := 21
 
-; Colores de la ventana
-COL_FONDO := "17171D", COL_PANEL := "24242E", COL_BOTON := "34343F"
-COL_VERDE := "27AE60", COL_ROJO := "C0392B", COL_NARANJA := "FF8A1F"
-COL_TEXTO := "EDEDF2", COL_GRIS := "9C9CA8"
+; Ventana: paleta "Spooksville de noche"
+C_NOCHE := "15121F", C_MURO := "221E33", C_TEJA := "2F2A46"
+C_CALABAZA := "FF7A1A", C_CALDERO := "7CDB5A", C_HUESO := "F2E9DC"
+C_NIEBLA := "8E88A8", C_SANGRE := "E0475B"
+F_TITULO := "Bahnschrift SemiBold", F_NUMEROS := "Bahnschrift", F_TEXTO := "Segoe UI"
 
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
@@ -98,8 +99,12 @@ teclasJugando := Map()
 compradasUltima := 0
 proximaHabilidad := 0
 vueltas := 0, compras := 0, puertasTocadas := 0
+caramelosActuales := -1, maximoActual := 0
+modoMini := false, autoCompacto := false, estadoPintado := ""
 
 CrearVentana()
+CrearMini()
+OnMessage(0x201, ArrastrarVentana)   ; arrastrar la ventana desde cualquier parte
 MostrarEstado(FileExist(ARCHIVO_RUTA) ? "Listo. Ponte junto al caldero y pulsa Iniciar."
     : "Primero graba tu ruta de puertas (botón Grabar ruta o F1).")
 SetTimer TimerContador, 3000
@@ -215,7 +220,7 @@ TerminarGrabacion() {
 GrabarRaton(tipo) {
     global
     MouseGetPos &x, &y, &ventana
-    if (ventana = ui.Hwnd)   ; clic en la ventana del macro (p. ej. el botón de terminar)
+    if (ventana = ui.Hwnd || ventana = uiMini.Hwnd)   ; clic en la ventana del macro
         return
     eventos.Push((A_TickCount - inicioGrabacion) "|" tipo "|" x "," y)
 }
@@ -239,6 +244,10 @@ IniciarParar() {
     if !ActivarRoblox()
         return
     estado := "jugando"
+    if !modoMini {           ; mientras trabaja, la ventana se reduce a una barra
+        Compactar()
+        autoCompacto := true
+    }
     SetTimer Bucle, -1
 }
 
@@ -745,133 +754,254 @@ Diagnostico() {
 
 CrearVentana() {
     global
-    ui := Gui("+AlwaysOnTop -MaximizeBox", "GPO Halloween")
-    ui.BackColor := COL_FONDO
-    ui.MarginX := 16, ui.MarginY := 12
-    ui.OnEvent("Close", (*) => Salir())
+    ui := Gui("-Caption +AlwaysOnTop", "GPO Halloween")
+    ui.BackColor := C_NOCHE
+    ui.MarginX := 14, ui.MarginY := 12
+    ui.OnEvent("Escape", (*) => Compactar())
 
-    ui.SetFont("s17 bold c" COL_NARANJA, "Segoe UI")
-    ui.Add("Text", "xm w340", "GPO Halloween")
-    ui.SetFont("s9 norm c" COL_GRIS)
-    ui.Add("Text", "xm y+0 w340", "Macro de caramelos · Spooksville")
+    ; --- cabecera (toda la ventana se puede arrastrar)
+    ui.SetFont("s14 c" C_CALABAZA, F_TITULO)
+    ui.Add("Text", "xm ym w190", "GPO HALLOWEEN")
+    ui.SetFont("s9 c" C_NIEBLA, F_TEXTO)
+    txtPunto := ui.Add("Text", "x+0 yp+5 w104 Right", "● Parado")
+    BotonPlano(ui, "x+8 yp-5 w26 h26", "s11", "–", C_TEJA, C_HUESO, Compactar)
+    BotonPlano(ui, "x+4 yp w26 h26", "s10", "✕", C_TEJA, C_HUESO, Salir)
 
-    ; --- contador de caramelos
-    ui.SetFont("s24 bold c" COL_TEXTO)
-    txtCaramelos := ui.Add("Text", "xm y+10 w340 Center", "— / —")
-    ui.SetFont("s9 norm c" COL_GRIS)
-    ui.Add("Text", "xm y+0 w340 Center", "caramelos")
-    barra := ui.Add("Progress", "xm y+6 w340 h8 c" COL_NARANJA " Background" COL_PANEL, 0)
+    ; --- caramelos: el número manda
+    ui.SetFont("s36 c" C_HUESO, F_NUMEROS)
+    txtCaramelos := ui.Add("Text", "xm y+6 w96", "—")
+    ui.SetFont("s15 c" C_NIEBLA, F_NUMEROS)
+    txtMaximo := ui.Add("Text", "x+4 yp+26 w90", "/ —")
+    ui.SetFont("s9 c" C_NIEBLA, F_TEXTO)
+    ui.Add("Text", "x+0 yp+5 w170 Right", "caramelos en la bolsa")
+    barra := ui.Add("Progress", "xm y+12 w360 h6 c" C_CALABAZA " Background" C_TEJA, 0)
 
-    ; --- compras
-    ui.SetFont("s10 bold c" COL_TEXTO)
-    ui.Add("Text", "xm y+16", "Compras")
-    ui.SetFont("s10 norm c" COL_TEXTO)
-    ddlModo := ui.Add("DropDownList", "xm y+6 w340",
-        ["Sin compras (solo recolectar)", "1x · compra una vez y para", "inf · compra todo y sigue"])
-    ddlModo.Value := MODO = "off" ? 1 : MODO = "1x" ? 2 : 3
-    lista := []
-    for a in ARTICULOS {
-        lista.Push(a[1] "   —   " a[2] " caramelos")
-        if (a[1] = ARTICULO_ELEGIDO)
-            elegido := A_Index
+    ; --- qué hacer al llenar la bolsa
+    Etiqueta("AL LLENAR LA BOLSA")
+    btnModo := Map()
+    for i, m in [["off", "Solo parar"], ["1x", "Comprar 1"], ["inf", "Comprar todo"]]
+        btnModo[m[1]] := BotonPlano(ui, (i = 1 ? "xm y+6" : "x+9 yp") " w114 h32", "s9 bold", m[2], C_TEJA, C_HUESO, SeleccionarModo.Bind(m[1]))
+    ui.SetFont("s9 norm c" C_NIEBLA, F_TEXTO)
+    txtAyuda := ui.Add("Text", "xm y+8 w360 h34", "")
+
+    ; --- tienda: una ficha por artículo, con cuántos te alcanzan
+    lbl := Etiqueta("ARTÍCULO DE LA TIENDA")
+    lbl.GetPos(, &ly, , &lh)
+    y0 := ly + lh + 6
+    fichas := []
+    for i, a in ARTICULOS {
+        x := 14 + Mod(i - 1, 3) * 124, y := y0 + ((i - 1) // 3) * 50
+        fondo := ui.Add("Text", Format("x{} y{} w112 h44 Background{}", x, y, C_TEJA))
+        ui.SetFont("s9 bold c" C_HUESO, F_TEXTO)
+        nom := ui.Add("Text", Format("x{} y{} w104 h18 Center Background{}", x + 4, y + 5, C_TEJA), a[3])
+        ui.SetFont("s9 norm c" C_NIEBLA, F_NUMEROS)
+        pre := ui.Add("Text", Format("x{} y{} w104 h16 Center Background{}", x + 4, y + 24, C_TEJA), a[2])
+        for ctrl in [fondo, nom, pre]
+            ctrl.OnEvent("Click", SeleccionarArticulo.Bind(i))
+        fichas.Push({fondo: fondo, nom: nom, pre: pre})
     }
-    ddlArticulo := ui.Add("DropDownList", "xm y+8 w340 R18", lista)
-    ddlArticulo.Value := elegido
-    txtPrecio := ui.Add("Text", "xm y+4 w340 c" COL_GRIS, "")
+    y := y0 + 6 * 50 + 6
 
-    ; --- opciones (casilla sin texto + etiqueta, para que el texto se vea en modo oscuro)
-    ui.SetFont("s10 bold c" COL_TEXTO)
-    ui.Add("Text", "xm y+12", "Opciones")
-    ui.SetFont("s10 norm c" COL_TEXTO)
-    chkHab := ui.Add("CheckBox", "xm y+8 w16 h20", "")
-    chkHab.Value := HABILIDAD_ACTIVA
-    lblHab := ui.Add("Text", "x+4 yp+1", "Usar habilidad C (slot 3) cada")
-    edtMin := ui.Add("Edit", "x+6 yp-3 w42 h24 Number Center c" COL_TEXTO " Background" COL_PANEL, HABILIDAD_MIN)
-    ui.Add("UpDown", "Range1-60", HABILIDAD_MIN)
-    ui.Add("Text", "x+6 yp+3", "min")
-    chkCam := ui.Add("CheckBox", "xm y+12 w16 h20", "")
-    chkCam.Value := ALINEAR_CAMARA
-    lblCam := ui.Add("Text", "x+4 yp+1", "Corregir la cámara al Norte en cada vuelta")
-    lblHab.OnEvent("Click", (*) => (chkHab.Value := !chkHab.Value, CambiarOpciones()))
-    lblCam.OnEvent("Click", (*) => (chkCam.Value := !chkCam.Value, CambiarOpciones()))
+    ; --- opciones
+    ui.SetFont("s10 norm c" C_HUESO, F_TEXTO)
+    ui.Add("Text", Format("x14 y{} w190 h26 0x200", y), "Habilidad C (slot 3) cada")
+    BotonPlano(ui, Format("x206 y{} w26 h26", y), "s11 bold", "−", C_TEJA, C_HUESO, CambiarMinutos.Bind(-1))
+    ui.SetFont("s10 c" C_HUESO, F_NUMEROS)
+    txtMin := ui.Add("Text", Format("x234 y{} w48 h26 Center 0x200 Background{}", y, C_MURO), "")
+    BotonPlano(ui, Format("x284 y{} w26 h26", y), "s11 bold", "+", C_TEJA, C_HUESO, CambiarMinutos.Bind(1))
+    pillHab := BotonPlano(ui, Format("x320 y{} w54 h26", y), "s8 bold", "", C_TEJA, C_HUESO, AlternarHabilidad)
+    y += 34
+    ui.SetFont("s10 norm c" C_HUESO, F_TEXTO)
+    ui.Add("Text", Format("x14 y{} w290 h26 0x200", y), "Corregir la cámara al Norte")
+    pillCam := BotonPlano(ui, Format("x320 y{} w54 h26", y), "s8 bold", "", C_TEJA, C_HUESO, AlternarCamara)
 
-    ; --- botones
-    btnIniciar := Boton("xm y+18 w340 h42", "s12", "▶   Iniciar   (F3)", COL_VERDE, IniciarParar)
-    btnCompra := Boton("xm y+8 w166 h32", "s9", "Probar compra (F4)", COL_BOTON, () => Lanzar(ProbarCompra))
-    btnRuta := Boton("x+8 yp w166 h32", "s9", "Grabar ruta (F1)", COL_BOTON, () => AlternarGrabacion(ARCHIVO_RUTA, "RUTA"))
-    btnCamara := Boton("xm y+8 w166 h32", "s9", "Probar cámara (F6)", COL_BOTON, () => Lanzar(ProbarCamara))
-    btnDiag := Boton("x+8 yp w166 h32", "s9", "Diagnóstico (F7)", COL_BOTON, () => (ActivarRoblox() && (Sleep(300), Diagnostico())))
+    ; --- acciones
+    ui.SetFont("s9 norm c" C_NIEBLA, F_TEXTO)
+    txtRuta := ui.Add("Text", "xm y+16 w360 h32", "")
+    btnIniciar := BotonPlano(ui, "xm y+6 w360 h46", "s13 bold", "", C_CALDERO, C_NOCHE, IniciarParar)
+    btnRuta := BotonPlano(ui, "xm y+8 w176 h32", "s9", "", C_TEJA, C_HUESO, () => AlternarGrabacion(ARCHIVO_RUTA, "RUTA"))
+    BotonPlano(ui, "x+8 yp w176 h32", "s9", "Probar compra  ·  F4", C_TEJA, C_HUESO, () => Lanzar(ProbarCompra))
+    BotonPlano(ui, "xm y+8 w176 h32", "s9", "Probar cámara  ·  F6", C_TEJA, C_HUESO, () => Lanzar(ProbarCamara))
+    BotonPlano(ui, "x+8 yp w176 h32", "s9", "Diagnóstico  ·  F7", C_TEJA, C_HUESO, () => (ActivarRoblox() && (Sleep(300), Diagnostico())))
 
-    ; --- ruta, estadísticas y estado
-    ui.SetFont("s9 norm c" COL_GRIS)
-    txtRuta := ui.Add("Text", "xm y+12 w340", "")
-    txtStats := ui.Add("Text", "xm y+2 w340", "")
-    ui.SetFont("s10 norm c" COL_VERDE)
-    txtEstado := ui.Add("Text", "xm y+8 w340 h40", "")
+    ; --- esta sesión
+    ui.SetFont("s16 c" C_HUESO, F_NUMEROS)
+    numVueltas := ui.Add("Text", "xm y+16 w116 Center", "0")
+    numPuertas := ui.Add("Text", "x+6 yp w116 Center", "0")
+    numCompras := ui.Add("Text", "x+6 yp w116 Center", "0")
+    ui.SetFont("s8 c" C_NIEBLA, F_TEXTO)
+    ui.Add("Text", "xm y+0 w116 Center", "vueltas")
+    ui.Add("Text", "x+6 yp w116 Center", "puertas tocadas")
+    ui.Add("Text", "x+6 yp w116 Center", "compras")
 
-    for ctrl in [ddlModo, ddlArticulo]
-        ctrl.OnEvent("Change", CambiarOpciones)
-    for ctrl in [chkHab, chkCam]
-        ctrl.OnEvent("Click", CambiarOpciones)
-    edtMin.OnEvent("Change", CambiarOpciones)
+    ; --- qué está haciendo ahora
+    ui.SetFont("s9 c" C_CALDERO, F_TEXTO)
+    txtEstado := ui.Add("Text", "xm y+12 w360 h34", "")
+    ui.SetFont("s8 c" C_NIEBLA, F_TEXTO)
+    ui.Add("Text", "xm y+2 w360", "Esc reduce la ventana   ·   F8 cierra el macro")
 
-    ; tema oscuro de Windows para la barra de título y las listas
-    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", ui.Hwnd, "Int", 20, "Int*", 1, "Int", 4)
-    for ctrl in [ddlModo, ddlArticulo, edtMin]
-        try DllCall("uxtheme\SetWindowTheme", "Ptr", ctrl.Hwnd, "Str", "DarkMode_CFD", "Ptr", 0)
-
+    EstiloVentana(ui)
     ActualizarRuta()
     ActualizarStats()
-    ActualizarOpcionesVisibles()
-    ; a la derecha de la pantalla, fuera de las zonas que el macro lee
-    ui.Show("x1525 y40 AutoSize NoActivate")
+    RefrescarOpciones()
+    PintarEstado()
+    x := IniRead(ARCHIVO_CONFIG, "ventana", "x", 1526), y := IniRead(ARCHIVO_CONFIG, "ventana", "y", 30)
+    if (x < 0 || x > A_ScreenWidth - 100 || y < 0 || y > A_ScreenHeight - 100)
+        x := 1526, y := 30
+    ui.Show("x" x " y" y " AutoSize NoActivate")
 }
 
-; Botón plano de color (un Text con fondo, como en el video).
-Boton(pos, tam, texto, color, accion) {
+; Barra pequeña que se muestra mientras el macro trabaja.
+CrearMini() {
     global
-    ui.SetFont(tam " bold cFFFFFF")
-    b := ui.Add("Text", pos " Center 0x200 Background" color, texto)   ; 0x200 = centrado vertical
+    uiMini := Gui("-Caption +AlwaysOnTop", "GPO Halloween")
+    uiMini.BackColor := C_NOCHE
+    uiMini.MarginX := 12, uiMini.MarginY := 10
+    uiMini.SetFont("s20 c" C_HUESO, F_NUMEROS)
+    miniCaramelos := uiMini.Add("Text", "xm ym w124 h36 0x200", "—")
+    uiMini.SetFont("s8 c" C_NIEBLA, F_TEXTO)
+    miniEstado := uiMini.Add("Text", "x+4 ym w138 h36", "")
+    miniIniciar := BotonPlano(uiMini, "x+6 ym w40 h36", "s12 bold", "▶", C_CALDERO, C_NOCHE, IniciarParar)
+    BotonPlano(uiMini, "x+4 ym w30 h36", "s12", "+", C_TEJA, C_HUESO, Expandir)
+    miniBarra := uiMini.Add("Progress", "xm y+8 w346 h4 c" C_CALABAZA " Background" C_TEJA, 0)
+    EstiloVentana(uiMini)
+}
+
+EstiloVentana(g) {
+    ; Windows 11: esquinas redondeadas y borde del color de las fichas (Windows 10 lo ignora)
+    c := Integer("0x" C_TEJA)
+    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 33, "Int*", 2, "Int", 4)
+    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 34
+        , "Int*", ((c & 0xFF) << 16) | (c & 0xFF00) | ((c >> 16) & 0xFF), "Int", 4)
+}
+
+Etiqueta(texto) {
+    global
+    ui.SetFont("s8 bold c" C_NIEBLA, F_TEXTO)
+    return ui.Add("Text", "xm y+16 w360", texto)
+}
+
+; Botón plano: un Text con fondo de color que responde al clic.
+BotonPlano(g, pos, fuente, texto, fondo, colorTexto, accion) {
+    g.SetFont(fuente " c" colorTexto, F_TEXTO)
+    b := g.Add("Text", pos " Center 0x200 Background" fondo, texto)   ; 0x200 = centrado vertical
     b.OnEvent("Click", (*) => accion())
     return b
 }
 
-PintarBoton(b, texto, color) {
-    if (b.Text != texto)
-        b.Text := texto
-    b.Opt("+Background" color)
-    b.Redraw()
+Pintar(ctrl, fondo, colorTexto, texto?) {
+    if IsSet(texto) && (ctrl.Text != texto)
+        ctrl.Text := texto
+    ctrl.Opt("Background" fondo)
+    ctrl.SetFont("c" colorTexto)
+    ctrl.Redraw()
 }
 
-ActualizarBotones() {
+ArrastrarVentana(wParam, lParam, msg, hwnd) {
     global
-    if !IsSet(btnIniciar)
+    if (hwnd = ui.Hwnd || hwnd = uiMini.Hwnd) {
+        PostMessage 0xA1, 2, 0, , "ahk_id " hwnd   ; WM_NCLBUTTONDOWN en la barra de título
+        return 0
+    }
+}
+
+Compactar(*) {
+    global
+    if modoMini
         return
-    if (estado = "jugando")
-        PintarBoton(btnIniciar, "■   Parar   (F3)", COL_ROJO)
-    else
-        PintarBoton(btnIniciar, "▶   Iniciar   (F3)", COL_VERDE)
-    if (estado = "grabando" && archivoGrabando = ARCHIVO_RUTA)
-        PintarBoton(btnRuta, "●  Terminar ruta (F1)", COL_ROJO)
-    else
-        PintarBoton(btnRuta, "Grabar ruta (F1)", COL_BOTON)
+    ui.GetPos(&x, &y)
+    GuardarPosicion(x, y)
+    ui.Hide()
+    uiMini.Show("x" x " y" y " AutoSize NoActivate")
+    modoMini := true
 }
 
-CambiarOpciones(*) {
+Expandir(*) {
     global
-    MODO := ["off", "1x", "inf"][ddlModo.Value]
-    ARTICULO_ELEGIDO := ARTICULOS[ddlArticulo.Value][1]
-    HABILIDAD_ACTIVA := chkHab.Value
-    HABILIDAD_MIN := Max(1, Integer(edtMin.Value = "" ? 5 : edtMin.Value))
-    ALINEAR_CAMARA := chkCam.Value
+    if !modoMini
+        return
+    uiMini.GetPos(&x, &y)
+    GuardarPosicion(x, y)
+    uiMini.Hide()
+    ui.Show("x" x " y" y " NoActivate")
+    modoMini := false, autoCompacto := false
+}
+
+GuardarPosicion(x, y) {
+    try {
+        IniWrite x, ARCHIVO_CONFIG, "ventana", "x"
+        IniWrite y, ARCHIVO_CONFIG, "ventana", "y"
+    }
+}
+
+; Botones y punto de estado según lo que esté haciendo el macro.
+PintarEstado() {
+    global
+    if !IsSet(miniIniciar)
+        return
+    clave := estado (estado = "grabando" ? archivoGrabando : "")
+    if (clave = estadoPintado)
+        return
+    estadoPintado := clave
+    if (estado = "jugando") {
+        Pintar(btnIniciar, C_SANGRE, C_HUESO, "■   Parar   ·   F3")
+        Pintar(miniIniciar, C_SANGRE, C_HUESO, "■")
+        Pintar(txtPunto, C_NOCHE, C_CALDERO, "● En marcha")
+    } else {
+        Pintar(btnIniciar, C_CALDERO, C_NOCHE, "▶   Iniciar   ·   F3")
+        Pintar(miniIniciar, C_CALDERO, C_NOCHE, "▶")
+        Pintar(txtPunto, C_NOCHE, estado = "grabando" ? C_SANGRE : C_NIEBLA, estado = "grabando" ? "● Grabando" : "● Parado")
+        if (estado = "parado" && autoCompacto)
+            Expandir()
+    }
+    if (estado = "grabando" && archivoGrabando = ARCHIVO_RUTA)
+        Pintar(btnRuta, C_SANGRE, C_HUESO, "●  Terminar ruta  ·  F1")
+    else
+        Pintar(btnRuta, C_TEJA, C_HUESO, "Grabar ruta  ·  F1")
+}
+
+SeleccionarModo(m, *) {
+    global
+    MODO := m
+    GuardarOpciones()
+}
+
+SeleccionarArticulo(i, *) {
+    global
+    if (MODO = "off")
+        MODO := "inf"        ; elegir un artículo activa las compras
+    ARTICULO_ELEGIDO := ARTICULOS[i][1]
+    GuardarOpciones()
+}
+
+CambiarMinutos(d, *) {
+    global
+    HABILIDAD_MIN := Max(1, Min(60, HABILIDAD_MIN + d))
+    GuardarOpciones()
+}
+
+AlternarHabilidad(*) {
+    global
+    HABILIDAD_ACTIVA := !HABILIDAD_ACTIVA
+    GuardarOpciones()
+}
+
+AlternarCamara(*) {
+    global
+    ALINEAR_CAMARA := !ALINEAR_CAMARA
+    GuardarOpciones()
+}
+
+GuardarOpciones() {
+    global
     AplicarOpciones()
-    ActualizarOpcionesVisibles()
+    RefrescarOpciones()
     try {
         IniWrite MODO, ARCHIVO_CONFIG, "opciones", "modo"
         IniWrite ARTICULO_ELEGIDO, ARCHIVO_CONFIG, "opciones", "articulo"
         IniWrite HABILIDAD_MIN, ARCHIVO_CONFIG, "opciones", "habilidad_min"
-        IniWrite HABILIDAD_ACTIVA, ARCHIVO_CONFIG, "opciones", "habilidad"
-        IniWrite ALINEAR_CAMARA, ARCHIVO_CONFIG, "opciones", "camara"
+        IniWrite HABILIDAD_ACTIVA ? 1 : 0, ARCHIVO_CONFIG, "opciones", "habilidad"
+        IniWrite ALINEAR_CAMARA ? 1 : 0, ARCHIVO_CONFIG, "opciones", "camara"
     }
 }
 
@@ -884,43 +1014,73 @@ AplicarOpciones() {
     HABILIDAD_CADA_MIN := HABILIDAD_ACTIVA ? HABILIDAD_MIN : 0
 }
 
-ActualizarOpcionesVisibles() {
+RefrescarOpciones() {
     global
-    ddlArticulo.Enabled := (MODO != "off")
+    for m, b in btnModo
+        Pintar(b, m = MODO ? C_CALABAZA : C_TEJA, m = MODO ? C_NOCHE : C_HUESO)
     precio := PRECIOS[ARTICULO_ELEGIDO]
-    txtPrecio.Value := (MODO = "off") ? "Al llenar la bolsa, el macro se detiene."
-        : (MODO = "1x") ? "Al llenar la bolsa compra 1 " ARTICULO_ELEGIDO " (" precio ") y se detiene."
-        : "Al llenar la bolsa compra todos los " ARTICULO_ELEGIDO " que pueda (" precio " c/u)."
+    txtAyuda.Value := (MODO = "off") ? "Recolecta hasta llenar la bolsa y se detiene. Elige un artículo para comprar."
+        : (MODO = "1x") ? "Compra 1 " ARTICULO_ELEGIDO " (" precio " caramelos) y se detiene."
+        : "Compra todos los " ARTICULO_ELEGIDO " que alcance (" precio " c/u) y vuelve a las puertas."
+    RefrescarFichas()
+    txtMin.Value := HABILIDAD_MIN " min"
+    Pintar(pillHab, HABILIDAD_ACTIVA ? C_CALDERO : C_TEJA, HABILIDAD_ACTIVA ? C_NOCHE : C_NIEBLA, HABILIDAD_ACTIVA ? "ON" : "OFF")
+    Pintar(pillCam, ALINEAR_CAMARA ? C_CALDERO : C_TEJA, ALINEAR_CAMARA ? C_NOCHE : C_NIEBLA, ALINEAR_CAMARA ? "ON" : "OFF")
+}
+
+; Pinta las fichas: la elegida en calabaza; el precio en verde si te alcanza, con cuántas.
+RefrescarFichas() {
+    global
+    for i, f in fichas {
+        a := ARTICULOS[i]
+        elegida := (a[1] = ARTICULO_ELEGIDO)
+        alcanza := caramelosActuales >= 0 ? caramelosActuales // a[2] : 0
+        textoPrecio := a[2] (alcanza > 0 ? "   ·   ×" alcanza : "")
+        if (MODO = "off")
+            fondo := C_MURO, cNom := C_NIEBLA, cPre := C_NIEBLA
+        else if elegida
+            fondo := C_CALABAZA, cNom := C_NOCHE, cPre := C_NOCHE
+        else
+            fondo := C_TEJA, cNom := C_HUESO, cPre := alcanza > 0 ? C_CALDERO : C_NIEBLA
+        Pintar(f.fondo, fondo, cNom)
+        Pintar(f.nom, fondo, cNom)
+        Pintar(f.pre, fondo, cPre, textoPrecio)
+    }
 }
 
 ActualizarRuta() {
     global
     if !FileExist(ARCHIVO_RUTA) {
-        txtRuta.Value := "Ruta: sin grabar"
+        txtRuta.Value := "Ruta sin grabar: ponte en el caldero y pulsa Grabar ruta."
         return
     }
     n := 0
     loop parse FileRead(ARCHIVO_RUTA), "`n", "`r"
         if InStr(A_LoopField, "|kd|e")
             n++
-    txtRuta.Value := "Ruta: grabada (" n " puertas)"
+    txtRuta.Value := "Ruta grabada: " n " puertas. Empieza en el caldero mirando al Norte."
 }
 
 ActualizarStats() {
     global
-    if IsSet(txtStats)
-        txtStats.Value := "Vueltas: " vueltas "   ·   Puertas tocadas: " puertasTocadas "   ·   Compras: " compras
+    if !IsSet(numVueltas)
+        return
+    numVueltas.Value := vueltas
+    numPuertas.Value := puertasTocadas
+    numCompras.Value := compras
 }
 
 MostrarCaramelos(a, b) {
     global
-    if !IsSet(txtCaramelos)
+    if !IsSet(miniCaramelos) || (a = caramelosActuales && b = maximoActual)
         return
-    txt := a " / " b
-    if (txtCaramelos.Value != txt) {
-        txtCaramelos.Value := txt
-        barra.Value := Round(a * 100 / b)
-    }
+    caramelosActuales := a, maximoActual := b
+    txtCaramelos.Value := a
+    txtMaximo.Value := "/ " b
+    miniCaramelos.Value := a " / " b
+    barra.Value := Round(a * 100 / b)
+    miniBarra.Value := barra.Value
+    RefrescarFichas()
 }
 
 ; Con el macro parado, mantiene el contador al día mientras juegas.
@@ -930,7 +1090,13 @@ TimerContador() {
         LeerContador()
 }
 
-Salir() {
+Salir(*) {
+    global
+    try {
+        g := modoMini ? uiMini : ui
+        g.GetPos(&x, &y)
+        GuardarPosicion(x, y)
+    }
     SoltarTodo()
     ExitApp
 }
@@ -983,7 +1149,8 @@ SoltarTodo() {
 MostrarEstado(texto) {
     global
     txtEstado.Value := texto
-    ActualizarBotones()
+    miniEstado.Value := texto
+    PintarEstado()
 }
 
 F8:: Salir()
