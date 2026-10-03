@@ -15,7 +15,9 @@ Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inye
 - **Cada 5 minutos usa la habilidad C:** saca la fruta (slot 3), pulsa C y vuelve a la bolsa (slot 2).
   Lo hace al empezar y luego en la siguiente parada (una puerta o el caldero), nunca caminando.
   Se ajusta en `HABILIDAD_CADA_MIN`, `SLOT_HABILIDAD`, `TECLA_HABILIDAD` y `ESPERA_HABILIDAD`; con `HABILIDAD_CADA_MIN := 0` se desactiva.
-- **Corrige la cámara al Norte** antes de cada vuelta: busca la "N" blanca de la brújula (`Lib/norte.png`) y la centra. Solo corrige desvíos pequeños; si no ve la N, no gira.
+- **Corrige la cámara** antes de cada vuelta: busca la "N" blanca de la brújula (`Lib/norte.png`) y la deja **en el mismo sitio que cuando grabaste la ruta**. Solo corrige desvíos pequeños; si no ve la N, no gira.
+- **Comprueba que la bolsa está en la mano** (slot 2, borde blanco) antes de cada E. Con la fruta equipada, E sería un ataque y no tocaría la puerta.
+- Si pulsaste E varias veces en la misma puerta al grabar, cuenta como **una sola puerta**. Los números (1-9) y la C que pulses al grabar se ignoran: de eso se encarga el macro.
 - Si Roblox se desconecta, pulsa "Reconnect" si aparece y se detiene.
 
 Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macro externo no puede saber en qué coordenadas está tu personaje.
@@ -77,5 +79,6 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 - **No lee el contador o los mensajes:** pulsa F7 en esa situación y mándame `diagnostico.txt` junto con una captura.
 - **No encuentra el artículo o no confirma la compra:** mándame una captura justo después de hacer clic en el artículo.
 - **El personaje se desvía con las vueltas:** graba una ruta más corta o con más choques contra paredes.
+- **Cualquier otra cosa:** mándame `registro.txt`. Ahí queda, con la hora, todo lo que hizo el macro en la última sesión.
 
 Créditos: lectura de pantalla con [OCR de Descolada](https://github.com/Descolada/OCR) (licencia MIT, `Lib/OCR-LICENSE.txt`).

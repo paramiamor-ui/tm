@@ -154,7 +154,7 @@ F2:: AlternarGrabacion(ARCHIVO_COMPRA, "COMPRA")
 
 AlternarGrabacion(archivo, nombre) {
     global
-    local k
+    local k, nx
     if (estado = "grabando") {
         if (archivo = archivoGrabando)
             TerminarGrabacion()
@@ -162,6 +162,11 @@ AlternarGrabacion(archivo, nombre) {
     }
     if (estado != "parado" || !ActivarRoblox())
         return
+    if (archivo = ARCHIVO_RUTA) {
+        ; recuerda dónde estaba la N al grabar: cada vuelta se vuelve a ese mismo ángulo
+        nx := BuscarNorte()
+        try IniWrite nx, ARCHIVO_CONFIG, "ruta", "norte_x"
+    }
     eventos := []
     pulsadas := Map()
     archivoGrabando := archivo
@@ -200,12 +205,9 @@ TerminarGrabacion() {
     for nombre in pulsadas
         eventos.Push(t "|ku|" nombre)
     texto := ""
-    puertas := 0
-    for linea in eventos {
+    for linea in eventos
         texto .= linea "`n"
-        if InStr(linea, "|kd|e")
-            puertas++
-    }
+    puertas := PuertasDeRuta(eventos).Count
     if FileExist(archivoGrabando)
         FileDelete archivoGrabando
     FileAppend texto, archivoGrabando
@@ -283,6 +285,12 @@ Bucle() {
     local c, espera
     vueltas := 0, compras := 0, puertasTocadas := 0
     ActualizarStats()
+    try FileDelete A_ScriptDir "\registro.txt"
+    if !EquiparSlot(SLOT_BOLSA) {
+        estado := "parado"
+        MostrarEstado("Parado")
+        return
+    }
     lleno := false
     proximaHabilidad := A_TickCount
     loop {
@@ -344,10 +352,7 @@ EsperaMinima() {
     local minimo, resto, total
     if !FileExist(ARCHIVO_RUTA)
         return 0
-    total := 0
-    loop parse FileRead(ARCHIVO_RUTA), "`n", "`r"
-        if InStr(A_LoopField, "|kd|e")
-            total++
+    total := PuertasDeRuta(LeerRuta(ARCHIVO_RUTA)).Count
     if (total = 0)
         return 0
     minimo := ""
@@ -362,20 +367,43 @@ EsperaMinima() {
 
 ; ================= REPRODUCCIÓN =================
 
+; Qué pulsaciones de E de la ruta son puertas: varias E seguidas sin caminar entre
+; ellas cuentan como una sola puerta. Devuelve Map(número de línea -> puerta).
+PuertasDeRuta(lineas) {
+    puertas := Map(), n := 0, movido := true
+    for i, linea in lineas {
+        p := StrSplit(linea, "|")
+        if (p.Length < 3 || p[2] != "kd")
+            continue
+        if (p[3] = "e") {
+            if movido
+                puertas[i] := ++n
+            movido := false
+        } else if RegExMatch(p[3], "i)^(w|a|s|d|space|q)$")
+            movido := true
+    }
+    return puertas
+}
+
+LeerRuta(archivo) => StrSplit(Trim(FileRead(archivo), "`r`n"), "`n", "`r")
+
 ; Reproduce un archivo grabado. Con conPuertas, cada E de la ruta se convierte en
 ; TocarPuerta(n). Devuelve false si se paró (F3 o Roblox perdió el foco).
 Reproducir(archivo, conPuertas := false) {
     global
-    local antes, base, k, linea, lineas, p, puerta, t, xy
-    lineas := StrSplit(Trim(FileRead(archivo), "`r`n"), "`n", "`r")
+    local antes, base, i, k, linea, lineas, p, puertas, t, xy
+    lineas := LeerRuta(archivo)
+    puertas := PuertasDeRuta(lineas)
     base := A_TickCount
-    puerta := 0
     teclasJugando := Map()
-    for linea in lineas {
+    for i, linea in lineas {
         if (linea = "")
             continue
         p := StrSplit(linea, "|")
         t := Integer(p[1])
+        ; en la ruta, los cambios de slot y la C los hace el propio macro
+        if (conPuertas && RegExMatch(p[3], "^([1-9]|c)$"))
+            continue
         while (A_TickCount - base < t) {
             if !SeguirJugando() {
                 SoltarTodo()
@@ -384,12 +412,11 @@ Reproducir(archivo, conPuertas := false) {
             Sleep 5
         }
         if (conPuertas && p[3] = "e" && (p[2] = "kd" || p[2] = "ku")) {
-            if (p[2] = "kd") {
-                puerta++
+            if (p[2] = "kd" && puertas.Has(i)) {
                 antes := A_TickCount
                 for k in teclasJugando
                     SendEvent "{" k " up}"
-                if !TocarPuerta(puerta) {
+                if !TocarPuerta(puertas[i]) {
                     SoltarTodo()
                     return false
                 }
@@ -429,6 +456,8 @@ TocarPuerta(n) {
         MostrarEstado("Puerta " n " - en recarga (" Ceil((listoEn[n] - A_TickCount) / 1000) " s)")
         return true
     }
+    if !EquiparSlot(SLOT_BOLSA)
+        return false
     visto := RegExMatch(LeerTexto(ZONA_KNOCK, 1), "i)kn[o0]ck")
     MostrarEstado("Puerta " n (visto ? " - tocando" : " - no veo 'Knock', intento igual"))
     antes := LeerContador()
@@ -496,17 +525,38 @@ HabilidadSiToca() {
     if (HABILIDAD_CADA_MIN <= 0 || A_TickCount < proximaHabilidad)
         return true
     MostrarEstado("Usando la habilidad " StrUpper(TECLA_HABILIDAD) " (slot " SLOT_HABILIDAD ")")
-    SendEvent "{" SLOT_HABILIDAD "}"
-    if !Esperar(500)
+    proximaHabilidad := A_TickCount + HABILIDAD_CADA_MIN * 60000
+    if !EquiparSlot(SLOT_HABILIDAD) || !Esperar(300)
         return false
     SendEvent "{" TECLA_HABILIDAD " down}"
     Sleep MANTENER_HABILIDAD
     SendEvent "{" TECLA_HABILIDAD " up}"
     if !Esperar(ESPERA_HABILIDAD)
         return false
-    SendEvent "{" SLOT_BOLSA "}"
-    proximaHabilidad := A_TickCount + HABILIDAD_CADA_MIN * 60000
-    return Esperar(500)
+    ; vuelve a la bolsa: con la fruta en la mano, E sería "Shock Punch" y no tocaría la puerta
+    return EquiparSlot(SLOT_BOLSA) && Esperar(300)
+}
+
+; ================= SLOTS =================
+
+; El slot equipado tiene el borde blanco (los demás, gris).
+SlotEquipado(n) {
+    x0 := 618 + (n - 1) * 78
+    return PixelSearch(&px, &py, x0 - 3, 1012, x0 + 3, 1062, 0xFFFFFF, 40)
+        && PixelSearch(&px, &py, x0 + 55, 1012, x0 + 61, 1062, 0xFFFFFF, 40)
+}
+
+; Equipa el slot solo si no lo está (pulsar el número de un slot ya equipado lo guarda).
+EquiparSlot(n) {
+    loop 4 {
+        if SlotEquipado(n)
+            return true
+        SendEvent "{" n "}"
+        if !Esperar(600)
+            return false
+    }
+    Registrar("No pude confirmar que el slot " n " esté equipado")
+    return true
 }
 
 ; ================= CÁMARA =================
@@ -532,9 +582,17 @@ BuscarNorte() {
 
 ; Corrige la cámara hasta que la N quede en el centro de la brújula.
 ; Solo corrige desvíos pequeños: si no ve la N, no gira (empieza siempre mirando al Norte).
-AlinearCamara() {
+; Gira la cámara hasta que la N quede donde estaba al grabar la ruta.
+AlinearCamara(objetivo := "") {
     global
     local cx, dif, factor, paso, ultimoPaso
+    if (objetivo = "")
+        objetivo := IniRead(ARCHIVO_CONFIG, "ruta", "norte_x", "")
+    if (objetivo = "") {
+        MostrarEstado("La ruta se grabó sin ver la N: no corrijo la cámara (graba la ruta mirando al Norte)")
+        return true
+    }
+    objetivo := Integer(objetivo)
     factor := FACTOR_GIRO
     ultimoPaso := 0
     loop 15 {
@@ -551,8 +609,8 @@ AlinearCamara() {
             ultimoPaso := 0
             continue
         }
-        dif := cx - 960
-        if (Abs(dif) <= 8)
+        dif := cx - objetivo
+        if (Abs(dif) <= 6)
             return true
         MostrarEstado("Alineando la cámara al Norte")
         paso := Round(dif * factor)
@@ -584,7 +642,7 @@ GirarCamara(dx) {
 ProbarCamara() {
     global
     local ok
-    ok := AlinearCamara()
+    ok := AlinearCamara(IniRead(ARCHIVO_CONFIG, "ruta", "norte_x", 960))
     estado := "parado"
     MostrarEstado(ok ? "Prueba de cámara terminada" : "Prueba de cámara cancelada")
 }
@@ -600,6 +658,8 @@ Comprar() {
         return true
     precio := PRECIOS[ARTICULO]
     abierta := false
+    if !EquiparSlot(SLOT_BOLSA)
+        return false
     loop 2 {
         SendEvent "{e down}"
         Sleep MANTENER_E
@@ -754,11 +814,17 @@ Diagnostico() {
     msg := LeerTexto(ZONA_MENSAJES)
     knock := LeerTexto(ZONA_KNOCK, 1)
     norte := BuscarNorte()
+    slot := ""
+    loop 9
+        if SlotEquipado(A_Index)
+            slot .= A_Index " "
     texto := "Contador: " (c = "" ? "NO LEÍDO (" LeerTexto(ZONA_CONTADOR) ")" : c[1] "/" c[2])
         . "`nMensajes: " StrReplace(msg, "`n", " | ")
         . "`n'Knock' visible: " (RegExMatch(knock, "i)kn[o0]ck") ? "sí" : "no")
         . "`nTienda abierta: " (TiendaAbierta() ? "sí (" LeerCaramelosTienda() " caramelos)" : "no")
-        . "`nBrújula: " (norte = "" ? "no veo la N en el centro" : "N en x=" norte " (centro = 960)")
+        . "`nBrújula: " (norte = "" ? "no veo la N en el centro" : "N en x=" norte)
+        . " (ruta grabada con N en x=" IniRead(ARCHIVO_CONFIG, "ruta", "norte_x", "?") ")"
+        . "`nSlot equipado: " (slot = "" ? "ninguno detectado" : slot)
     try FileDelete A_ScriptDir "\diagnostico.txt"
     FileAppend texto "`n", A_ScriptDir "\diagnostico.txt"
     ToolTip texto, 20, 300, 2
@@ -1076,10 +1142,7 @@ ActualizarRuta() {
         txtRuta.Value := "Ruta sin grabar: ponte en el caldero y pulsa Grabar ruta."
         return
     }
-    n := 0
-    loop parse FileRead(ARCHIVO_RUTA), "`n", "`r"
-        if InStr(A_LoopField, "|kd|e")
-            n++
+    n := PuertasDeRuta(LeerRuta(ARCHIVO_RUTA)).Count
     txtRuta.Value := "Ruta grabada: " n " puertas. Empieza en el caldero mirando al Norte."
 }
 
@@ -1125,6 +1188,11 @@ Salir(*) {
 }
 
 ; ================= UTILIDADES =================
+
+; registro.txt: lo que hizo el macro en la última sesión (útil para encontrar fallos).
+Registrar(texto) {
+    try FileAppend FormatTime(, "HH:mm:ss") "  " texto "`n", A_ScriptDir "\registro.txt", "UTF-8"
+}
 
 ; Roblox no registra clics si el ratón no se mueve antes: se mueve 1 px.
 RatonRoblox(tipo, x, y) {
@@ -1172,6 +1240,7 @@ SoltarTodo() {
 
 MostrarEstado(texto) {
     global
+    Registrar(texto)
     txtEstado.Value := texto
     miniEstado.Value := texto
     PintarEstado()
