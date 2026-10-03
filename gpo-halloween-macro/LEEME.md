@@ -5,6 +5,26 @@ Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inye
 
 > Usar macros en GPO puede costarte un baneo. Si no quieres arriesgar tu cuenta principal, úsalo en una secundaria.
 
+## Modo asistido (`GPO_Asistido.ahk`) — recomendado
+**Tú caminas por las calles; el macro hace el resto.** No usa rutas grabadas ni la cámara.
+- Toca cada puerta en cuanto aparece **"E Knock"** (la detecta por imagen y, si no, leyendo el texto).
+- Antes de cada E comprueba que la **bolsa** está en la mano.
+- Usa la **habilidad C** cada X minutos y vuelve a la bolsa.
+- Cuando la bolsa está **llena**, suena un aviso: ve con la bruja y pulsa **F4**. Abre la tienda, compra el artículo elegido y la cierra.
+
+| Tecla | Acción |
+|---|---|
+| F3 | Activar / pausar |
+| F4 | Comprar ahora (pegado a la bruja) |
+| F7 | Diagnóstico: contador, aviso "E Knock", slot equipado |
+| F8 | Salir |
+
+**Prueba de 10 segundos:** abre `GPO_Asistido`, pulsa **F3** y camina hasta una puerta. Al aparecer "E Knock", debe tocarla sola.
+Si no lo hace, ponte delante de la puerta, pulsa **F7** y manda una captura.
+
+Más abajo está el macro completo (`GPO_Halloween.ahk`), que además intenta caminar solo con una ruta grabada.
+
+
 ## Qué hace solo
 - **Busca las puertas mientras camina:** lee la pantalla unas 10 veces por segundo y, en cuanto aparece el aviso **"E Knock"** (`Lib/knock.png`), se detiene, toca y sigue la ruta. No hace falta pulsar E al grabar, aunque si lo haces también cuenta.
 - Toca cada puerta y lee el resultado:
