@@ -6,7 +6,8 @@ Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inye
 > Usar macros en GPO puede costarte un baneo. Si no quieres arriesgar tu cuenta principal, úsalo en una secundaria.
 
 ## Qué hace solo
-- Toca cada puerta de tu ruta con E y lee el resultado:
+- **Busca las puertas mientras camina:** lee la pantalla unas 10 veces por segundo y, en cuanto aparece el aviso **"E Knock"** (`Lib/knock.png`), se detiene, toca y sigue la ruta. No hace falta pulsar E al grabar, aunque si lo haces también cuenta.
+- Toca cada puerta y lee el resultado:
   - **Caramelos ganados (de 1 a 15) o robados**: cualquier cambio en el contador cuenta como puerta tocada y la marca como en recarga.
   - **"You already visited… Come back in 124s"**: anota esos 124 s y no la vuelve a tocar hasta que pasen.
 - Lee el contador **"X/500 Candies"**. Cuando la bolsa está llena (o sale *"Your candy basket is full!"*), deja de tocar puertas y termina la vuelta hasta la bruja.
@@ -38,6 +39,7 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 - **Artículo de la tienda:** pulsa una ficha para elegirla (queda en naranja). El número en verde (`×2`) es **cuántas te alcanzan** con los caramelos que llevas.
 - **Habilidad C:** − / + cambia cada cuántos minutos; ON/OFF la activa o la desactiva.
 - **Corregir la cámara al Norte:** ON/OFF.
+- **Buscar puertas mientras camina:** ON/OFF.
 - **Iniciar** (verde) / **Parar** (rojo), y botones para grabar la ruta, probar la compra, probar la cámara y ver el diagnóstico.
 - Abajo: vueltas, puertas tocadas, compras y qué está haciendo ahora.
 
@@ -74,6 +76,17 @@ Lo único que tienes que hacer tú es **grabar la ruta una vez**, porque un macr
 4. **Prueba la compra:** junto a la bruja, pulsa **F4**.
 5. En la ventana, elige el **modo** y el **artículo**.
 6. Vuelve al caldero y pulsa **Iniciar** (o F3). Si cambias de ventana, se detiene solo.
+
+## Cómo grabar la ruta de Spooksville (32 puertas)
+Con "Buscar puertas mientras camina" en **ON**, la ruta solo tiene que **pasar por delante de todas las puertas**:
+1. Ponte **pegado al caldero**, con la **bolsa en la mano** y la cámara mirando al **Norte**. Pulsa **Grabar ruta** (o F1).
+2. Camina hasta la primera calle de casas (la puerta 1 de tu mapa).
+3. Recorre cada fila **pegado a las fachadas**, sin pararte: 1 → 8, 9 → 16, 17 → 24 y 25 → 32.
+   - Ir rozando las casas hace que el aviso "E Knock" salga en cada puerta, y que el personaje no se desvíe en cada vuelta.
+   - **No muevas la cámara.**
+4. Vuelve al centro y **choca contra el caldero**. Pulsa **F1**.
+
+Una vuelta de 32 puertas dura más que la recarga de una puerta (unos 2 minutos): al terminar, las primeras ya están listas otra vez.
 
 ## Si algo falla
 - **No lee el contador o los mensajes:** pulsa F7 en esa situación y mándame `diagnostico.txt` junto con una captura.

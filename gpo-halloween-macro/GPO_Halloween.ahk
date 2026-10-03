@@ -60,6 +60,7 @@ ARTICULO_ELEGIDO := IniRead(ARCHIVO_CONFIG, "opciones", "articulo", "Rare Fruit 
 HABILIDAD_MIN := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "habilidad_min", 5))
 HABILIDAD_ACTIVA := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "habilidad", 1))
 ALINEAR_CAMARA := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "camara", 1))
+BUSCAR_PUERTAS := Integer(IniRead(ARCHIVO_CONFIG, "opciones", "buscar", 1))
 if !PRECIOS.Has(ARTICULO_ELEGIDO)
     ARTICULO_ELEGIDO := "Rare Fruit Chest"
 ARTICULO := "", PARAR_TRAS_COMPRAR := false, COMPRAR_TODO := true, HABILIDAD_CADA_MIN := 0
@@ -75,6 +76,10 @@ ZONA_ITEMS    := [500, 290, 920, 580]     ; tarjetas de la tienda
 ; La letra del centro de la brújula es blanca pura; se busca la "N" como imagen.
 IMG_NORTE := A_ScriptDir "\Lib\norte.png"   ; 17x21, fondo magenta = transparente
 NORTE_W := 17, NORTE_H := 21
+; Aviso "E Knock" de las puertas (98x34, recortado de capturas reales a 1920x1080)
+IMG_KNOCK := A_ScriptDir "\Lib\knock.png"
+; Al buscar puertas caminando: tiempo de ruta antes de poder tocar otra vez si el aviso no desaparece
+REARME_MS := 2000
 
 ; Ventana: paleta "Spooksville de noche"
 C_NOCHE := "15121F", C_MURO := "221E33", C_TEJA := "2F2A46"
@@ -391,11 +396,12 @@ LeerRuta(archivo) => StrSplit(Trim(FileRead(archivo), "`r`n"), "`n", "`r")
 ; TocarPuerta(n). Devuelve false si se paró (F3 o Roblox perdió el foco).
 Reproducir(archivo, conPuertas := false) {
     global
-    local antes, base, i, k, linea, lineas, p, puertas, t, xy
+    local antes, armado, base, i, k, linea, lineas, p, proximoEscaneo, puertas, t, tUltimoToque, xy
     lineas := LeerRuta(archivo)
     puertas := PuertasDeRuta(lineas)
     base := A_TickCount
     teclasJugando := Map()
+    armado := true, tUltimoToque := -100000, proximoEscaneo := 0
     for i, linea in lineas {
         if (linea = "")
             continue
@@ -409,10 +415,34 @@ Reproducir(archivo, conPuertas := false) {
                 SoltarTodo()
                 return false
             }
+            ; buscar el aviso "E Knock" mientras camina (solo si la próxima tecla no está
+            ; a punto de tocar, para no alterar los tiempos de la ruta)
+            if (conPuertas && BUSCAR_PUERTAS && !lleno && A_TickCount >= proximoEscaneo
+                && t - (A_TickCount - base) > 150) {
+                proximoEscaneo := A_TickCount + 100
+                if !KnockVisible() {
+                    armado := true
+                } else if (armado || (A_TickCount - base) - tUltimoToque > REARME_MS) {
+                    antes := A_TickCount
+                    for k in teclasJugando
+                        SendEvent "{" k " up}"
+                    if !TocarPuerta("") {
+                        SoltarTodo()
+                        return false
+                    }
+                    for k in teclasJugando
+                        SendEvent "{" k " down}"
+                    base += A_TickCount - antes
+                    tUltimoToque := A_TickCount - base
+                    armado := false
+                    continue
+                }
+            }
             Sleep 5
         }
         if (conPuertas && p[3] = "e" && (p[2] = "kd" || p[2] = "ku")) {
-            if (p[2] = "kd" && puertas.Has(i)) {
+            ; una E grabada justo después de tocar una puerta encontrada es la misma puerta
+            if (p[2] = "kd" && puertas.Has(i) && (A_TickCount - base) - tUltimoToque > REARME_MS) {
                 antes := A_TickCount
                 for k in teclasJugando
                     SendEvent "{" k " up}"
@@ -423,6 +453,8 @@ Reproducir(archivo, conPuertas := false) {
                 for k in teclasJugando
                     SendEvent "{" k " down}"
                 base += A_TickCount - antes   ; la ruta continúa donde se quedó
+                tUltimoToque := A_TickCount - base
+                armado := false
             }
             continue
         }
@@ -443,23 +475,26 @@ Reproducir(archivo, conPuertas := false) {
     return SeguirJugando()
 }
 
+; Toca una puerta. n = número de puerta de la ruta grabada, o "" si la encontró
+; buscando el aviso "E Knock" mientras caminaba.
 TocarPuerta(n) {
     global
-    local antes, c, dif, fin, m, m2, msg, msgAntes, pos, resultado, visto
+    local antes, c, dif, etiqueta, fin, m, m2, msg, msgAntes, pos, resultado, visto
+    etiqueta := (n = "") ? "Puerta encontrada" : "Puerta " n
     if !HabilidadSiToca()
         return false
     if lleno {
-        MostrarEstado("Puerta " n " - bolsa llena, volviendo a la bruja")
+        MostrarEstado(etiqueta " - bolsa llena, volviendo a la bruja")
         return true
     }
-    if (listoEn.Has(n) && A_TickCount < listoEn[n]) {
-        MostrarEstado("Puerta " n " - en recarga (" Ceil((listoEn[n] - A_TickCount) / 1000) " s)")
+    if (n != "" && listoEn.Has(n) && A_TickCount < listoEn[n]) {
+        MostrarEstado(etiqueta " - en recarga (" Ceil((listoEn[n] - A_TickCount) / 1000) " s)")
         return true
     }
     if !EquiparSlot(SLOT_BOLSA)
         return false
-    visto := RegExMatch(LeerTexto(ZONA_KNOCK, 1), "i)kn[o0]ck")
-    MostrarEstado("Puerta " n (visto ? " - tocando" : " - no veo 'Knock', intento igual"))
+    visto := KnockVisible()
+    MostrarEstado(etiqueta (visto ? " - tocando" : " - no veo 'Knock', intento igual"))
     antes := LeerContador()
     msgAntes := LeerTexto(ZONA_MENSAJES)
     SendEvent "{e down}"
@@ -474,7 +509,7 @@ TocarPuerta(n) {
         if (c != "" && antes != "" && c[1] != antes[1]) {
             dif := c[1] - antes[1]
             resultado := dif > 0 ? "+" dif " caramelos" : "te robaron " (-dif) " caramelos"
-            listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
+            MarcarRecarga(n, RECARGA_PUERTA)
             if (c[1] >= c[2])
                 lleno := true
             break
@@ -488,10 +523,10 @@ TocarPuerta(n) {
             resultado := "bolsa llena"
         } else if RegExMatch(msg, "i)(\d+)\s*candies\s*were\s*stolen", &m) {
             resultado := "te robaron " m[1] " caramelos"
-            listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
+            MarcarRecarga(n, RECARGA_PUERTA)
         } else if RegExMatch(msg, "i)you\s*got\s*\+?\s*(\d+)", &m) {
             resultado := "+" m[1] " caramelos"
-            listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
+            MarcarRecarga(n, RECARGA_PUERTA)
         } else if RegExMatch(msg, "i)back\s*in\s*(\d+)", &m) {
             ; puede haber varias líneas: la última es la más reciente
             pos := 1
@@ -499,7 +534,7 @@ TocarPuerta(n) {
                 m := m2
                 pos += m2.Len
             }
-            listoEn[n] := A_TickCount + Integer(m[1]) * 1000
+            MarcarRecarga(n, Integer(m[1]))
             resultado := "ya visitada, vuelve en " m[1] " s"
         } else if !Esperar(250) {
             return false
@@ -511,10 +546,35 @@ TocarPuerta(n) {
     }
     if (resultado = "") {
         resultado := "sin respuesta"
-        listoEn[n] := A_TickCount + 20000   ; reintenta en la próxima vuelta pasados 20 s
+        MarcarRecarga(n, 20)   ; reintenta en la próxima vuelta pasados 20 s
     }
-    MostrarEstado("Puerta " n " - " resultado)
-    return Esperar(ESPERA_TRAS_TOCAR)
+    MostrarEstado(etiqueta " - " resultado)
+    ; solo hay aturdimiento si la puerta respondió con caramelos
+    return Esperar(InStr(resultado, "caramelos") ? ESPERA_TRAS_TOCAR : 300)
+}
+
+MarcarRecarga(n, segundos) {
+    global listoEn
+    if (n != "")
+        listoEn[n] := A_TickCount + segundos * 1000
+}
+
+; ¿Está en pantalla el aviso "E Knock" de una puerta? (búsqueda por imagen, rápida)
+KnockVisible() {
+    global
+    local c, fx, fy, pt
+    try {
+        if !ImageSearch(&fx, &fy, 450, 250, 1450, 750, "*70 *TransFF00FF " IMG_KNOCK)
+            return false
+    } catch
+        return false
+    ; el interior del recuadro de la E tiene que ser oscuro (descarta zonas blancas)
+    for pt in [[6, 8], [22, 8], [6, 24], [22, 24], [14, 26], [22, 16]] {
+        c := PixelGetColor(fx + pt[1], fy + pt[2])
+        if (Max((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF) >= 150)
+            return false
+    }
+    return true
 }
 
 ; ================= HABILIDAD PERIÓDICA =================
@@ -812,7 +872,6 @@ F7:: Diagnostico()
 Diagnostico() {
     c := LeerContador()
     msg := LeerTexto(ZONA_MENSAJES)
-    knock := LeerTexto(ZONA_KNOCK, 1)
     norte := BuscarNorte()
     slot := ""
     loop 9
@@ -820,7 +879,7 @@ Diagnostico() {
             slot .= A_Index " "
     texto := "Contador: " (c = "" ? "NO LEÍDO (" LeerTexto(ZONA_CONTADOR) ")" : c[1] "/" c[2])
         . "`nMensajes: " StrReplace(msg, "`n", " | ")
-        . "`n'Knock' visible: " (RegExMatch(knock, "i)kn[o0]ck") ? "sí" : "no")
+        . "`n'Knock' visible: " (KnockVisible() ? "sí" : "no")
         . "`nTienda abierta: " (TiendaAbierta() ? "sí (" LeerCaramelosTienda() " caramelos)" : "no")
         . "`nBrújula: " (norte = "" ? "no veo la N en el centro" : "N en x=" norte)
         . " (ruta grabada con N en x=" IniRead(ARCHIVO_CONFIG, "ruta", "norte_x", "?") ")"
@@ -896,6 +955,10 @@ CrearVentana() {
     ui.SetFont("s10 norm c" C_HUESO, F_TEXTO)
     ui.Add("Text", Format("x14 y{} w290 h26 0x200", y), "Corregir la cámara al Norte")
     pillCam := BotonPlano(ui, Format("x320 y{} w54 h26", y), "s8 bold", "", C_TEJA, C_HUESO, AlternarCamara)
+    y += 34
+    ui.SetFont("s10 norm c" C_HUESO, F_TEXTO)
+    ui.Add("Text", Format("x14 y{} w290 h26 0x200", y), "Buscar puertas mientras camina")
+    pillBuscar := BotonPlano(ui, Format("x320 y{} w54 h26", y), "s8 bold", "", C_TEJA, C_HUESO, AlternarBuscar)
 
     ; --- acciones
     ui.SetFont("s9 norm c" C_NIEBLA, F_TEXTO)
@@ -1071,6 +1134,12 @@ AlternarHabilidad(*) {
     GuardarOpciones()
 }
 
+AlternarBuscar(*) {
+    global
+    BUSCAR_PUERTAS := !BUSCAR_PUERTAS
+    GuardarOpciones()
+}
+
 AlternarCamara(*) {
     global
     ALINEAR_CAMARA := !ALINEAR_CAMARA
@@ -1087,6 +1156,7 @@ GuardarOpciones() {
         IniWrite HABILIDAD_MIN, ARCHIVO_CONFIG, "opciones", "habilidad_min"
         IniWrite HABILIDAD_ACTIVA ? 1 : 0, ARCHIVO_CONFIG, "opciones", "habilidad"
         IniWrite ALINEAR_CAMARA ? 1 : 0, ARCHIVO_CONFIG, "opciones", "camara"
+        IniWrite BUSCAR_PUERTAS ? 1 : 0, ARCHIVO_CONFIG, "opciones", "buscar"
     }
 }
 
@@ -1112,6 +1182,7 @@ RefrescarOpciones() {
     txtMin.Value := HABILIDAD_MIN " min"
     Pintar(pillHab, HABILIDAD_ACTIVA ? C_CALDERO : C_TEJA, HABILIDAD_ACTIVA ? C_NOCHE : C_NIEBLA, HABILIDAD_ACTIVA ? "ON" : "OFF")
     Pintar(pillCam, ALINEAR_CAMARA ? C_CALDERO : C_TEJA, ALINEAR_CAMARA ? C_NOCHE : C_NIEBLA, ALINEAR_CAMARA ? "ON" : "OFF")
+    Pintar(pillBuscar, BUSCAR_PUERTAS ? C_CALDERO : C_TEJA, BUSCAR_PUERTAS ? C_NOCHE : C_NIEBLA, BUSCAR_PUERTAS ? "ON" : "OFF")
 }
 
 ; Pinta las fichas: la elegida en calabaza; el precio en verde si te alcanza, con cuántas.
@@ -1143,7 +1214,7 @@ ActualizarRuta() {
         return
     }
     n := PuertasDeRuta(LeerRuta(ARCHIVO_RUTA)).Count
-    txtRuta.Value := "Ruta grabada: " n " puertas. Empieza en el caldero mirando al Norte."
+    txtRuta.Value := "Ruta grabada (" n " E pulsadas). Empieza en el caldero mirando al Norte."
 }
 
 ActualizarStats() {
