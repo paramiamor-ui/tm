@@ -7,11 +7,14 @@ Solo **lee la pantalla** (OCR de Windows) y **simula teclado y ratón**. No inye
 
 ## Qué hace solo
 - Toca cada puerta de tu ruta con E y lee el resultado:
-  - **+5 caramelos**: anota que esa puerta tarda en recargar.
+  - **Caramelos ganados (de 1 a 15) o robados**: cualquier cambio en el contador cuenta como puerta tocada y la marca como en recarga.
   - **"You already visited… Come back in 124s"**: anota esos 124 s y no la vuelve a tocar hasta que pasen.
 - Lee el contador **"X/500 Candies"**. Cuando la bolsa está llena (o sale *"Your candy basket is full!"*), deja de tocar puertas y termina la vuelta hasta la bruja.
 - **Compra solo:** abre la Halloween Shop, hace scroll hasta el artículo, lo compra (todas las veces que alcancen los caramelos) y cierra la tienda.
 - Si todas las puertas están en recarga, espera junto a la bruja.
+- **Cada 5 minutos usa la habilidad C:** saca la fruta (slot 3), pulsa C y vuelve a la bolsa (slot 2).
+  Lo hace al empezar y luego en la siguiente parada (una puerta o el caldero), nunca caminando.
+  Se ajusta en `HABILIDAD_CADA_MIN`, `SLOT_HABILIDAD`, `TECLA_HABILIDAD` y `ESPERA_HABILIDAD`; con `HABILIDAD_CADA_MIN := 0` se desactiva.
 - **Alinea la cámara al Norte** con la brújula antes de cada vuelta, para que la ruta no se tuerza.
 - Si Roblox se desconecta, pulsa "Reconnect" si aparece y se detiene.
 

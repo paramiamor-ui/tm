@@ -30,6 +30,13 @@ RECARGA_PUERTA := 180
 FACTOR_GIRO := 0.5
 ; Alinear la cámara al Norte antes de cada vuelta.
 ALINEAR_CAMARA := true
+; Habilidad periódica: saca la fruta (slot 3), usa C y vuelve a la bolsa (slot 2).
+HABILIDAD_CADA_MIN := 5      ; 0 = desactivado
+SLOT_HABILIDAD := "3"
+TECLA_HABILIDAD := "c"
+MANTENER_HABILIDAD := 300    ; ms que se mantiene C
+ESPERA_HABILIDAD := 2500     ; ms de animación antes de volver a la bolsa
+SLOT_BOLSA := "2"
 ; ------------------------------------------------
 
 PRECIOS := Map(
@@ -45,7 +52,7 @@ CLAVES := Map("Plague Doctor Costume", "plaguedoctor", "Legendary Fruit Chest Bl
     "Race Reroll x5", "racereroll")
 
 ROBLOX := "ahk_exe RobloxPlayerBeta.exe"
-TECLAS := ["w", "a", "s", "d", "Space", "e", "q", "LShift", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+TECLAS := ["w", "a", "s", "d", "Space", "e", "q", "c", "LShift", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 ARCHIVO_RUTA := A_ScriptDir "\ruta.txt"
 ARCHIVO_COMPRA := A_ScriptDir "\compra.txt"
 
@@ -72,6 +79,7 @@ lleno := false
 listoEn := Map()     ; puerta -> A_TickCount en que vuelve a estar disponible
 teclasJugando := Map()
 compradasUltima := 0
+proximaHabilidad := 0
 
 MostrarEstado("Listo - F1 grabar ruta, F3 iniciar, F7 diagnóstico")
 
@@ -233,6 +241,7 @@ Bucle() {
     global
     vueltas := 0, compras := 0
     lleno := false
+    proximaHabilidad := A_TickCount
     loop {
         if Desconectado()
             break
@@ -270,6 +279,8 @@ Bucle() {
                 break
         }
 
+        if !HabilidadSiToca()
+            break
         if (ALINEAR_CAMARA && !AlinearCamara())
             break
         MostrarEstado("Vuelta " (vueltas + 1) " - recorriendo puertas")
@@ -360,6 +371,8 @@ Reproducir(archivo, conPuertas := false) {
 
 TocarPuerta(n) {
     global
+    if !HabilidadSiToca()
+        return false
     if lleno {
         MostrarEstado("Puerta " n " - bolsa llena, volviendo a la bruja")
         return true
@@ -380,8 +393,10 @@ TocarPuerta(n) {
     fin := A_TickCount + 3000
     while (A_TickCount < fin && resultado = "") {
         c := LeerContador()
-        if (c != "" && antes != "" && c[1] > antes[1]) {
-            resultado := "+" (c[1] - antes[1]) " caramelos"
+        ; las puertas dan entre 1 y 15 caramelos, o te los roban: cualquier cambio cuenta
+        if (c != "" && antes != "" && c[1] != antes[1]) {
+            dif := c[1] - antes[1]
+            resultado := dif > 0 ? "+" dif " caramelos" : "te robaron " (-dif) " caramelos"
             listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
             if (c[1] >= c[2])
                 lleno := true
@@ -394,6 +409,12 @@ TocarPuerta(n) {
         } else if RegExMatch(msg, "i)full|reached") {
             lleno := true
             resultado := "bolsa llena"
+        } else if RegExMatch(msg, "i)(\d+)\s*candies\s*were\s*stolen", &m) {
+            resultado := "te robaron " m[1] " caramelos"
+            listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
+        } else if RegExMatch(msg, "i)you\s*got\s*\+?\s*(\d+)", &m) {
+            resultado := "+" m[1] " caramelos"
+            listoEn[n] := A_TickCount + RECARGA_PUERTA * 1000
         } else if RegExMatch(msg, "i)back\s*in\s*(\d+)", &m) {
             ; puede haber varias líneas: la última es la más reciente
             pos := 1
@@ -413,6 +434,27 @@ TocarPuerta(n) {
     }
     MostrarEstado("Puerta " n " - " resultado)
     return Esperar(ESPERA_TRAS_TOCAR)
+}
+
+; ================= HABILIDAD PERIÓDICA =================
+
+; Si ya pasaron HABILIDAD_CADA_MIN minutos: slot 3, C, y de vuelta a la bolsa (slot 2).
+HabilidadSiToca() {
+    global
+    if (HABILIDAD_CADA_MIN <= 0 || A_TickCount < proximaHabilidad)
+        return true
+    MostrarEstado("Usando la habilidad " StrUpper(TECLA_HABILIDAD) " (slot " SLOT_HABILIDAD ")")
+    SendEvent "{" SLOT_HABILIDAD "}"
+    if !Esperar(500)
+        return false
+    SendEvent "{" TECLA_HABILIDAD " down}"
+    Sleep MANTENER_HABILIDAD
+    SendEvent "{" TECLA_HABILIDAD " up}"
+    if !Esperar(ESPERA_HABILIDAD)
+        return false
+    SendEvent "{" SLOT_BOLSA "}"
+    proximaHabilidad := A_TickCount + HABILIDAD_CADA_MIN * 60000
+    return Esperar(500)
 }
 
 ; ================= CÁMARA =================
