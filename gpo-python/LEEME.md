@@ -30,11 +30,14 @@ La ruta se guarda como **tramos** ("W+D durante 3,4 s"). Los tramos que marcas c
 1. Ponte **pegado al caldero**, con la **bolsa en la mano** y la cámara **mirando al Norte** (la N blanca arriba en el centro).
 2. Pulsa **F1** y camina la ruta **pegado a las fachadas**. No hace falta pulsar E: el macro toca las puertas solo.
 3. Cada vez que **choques con una esquina o una pared**, pulsa **F2** (mientras sigues empujando contra ella o justo después).
+   **F2 no es para las puertas:** solo para choques de verdad. En la ruta recomendada son unas 3-5 veces: esquina A, esquina B, alguna pared más y el caldero al final.
+   Un tramo con F2 se alarga medio segundo al repetirlo; delante de una puerta, eso hace que el personaje se pase y se desvíe.
 4. Termina **chocando contra el caldero**, pulsa **F2** y luego **F1**.
 5. **No muevas la cámara** mientras grabas.
 
 En `ruta-recomendada.png` (en la carpeta del macro de AutoHotkey) está el orden de puertas recomendado, con las esquinas A y B donde conviene chocar.
 
 ## Si algo falla
+- Si grabas por error una ruta vacía, no se guarda; y cada ruta nueva deja la anterior en `ruta_anterior.json`.
 - Pulsa **F7** en el momento del problema y manda **`diagnostico.png`** y **`registro.txt`**. Con la captura se puede probar la detección exactamente como la ve el macro.
 - `probar_vision.bat`: arrastra capturas encima para ver qué detecta (aviso Knock, N de la brújula, slot equipado).

@@ -270,6 +270,7 @@ class Macro:
         self.pared_actual = False
         self.norte_grabado = None
         self.f_pulsadas = set()
+        self.inicio_grabacion = 0.0
 
     # ---------- control ----------
     def sigue(self):
@@ -592,18 +593,27 @@ class Macro:
         if self.activo.is_set():
             return
         if self.grabando:
+            if time.perf_counter() - self.inicio_grabacion < 1.5:
+                return      # F1 doble sin querer: sigue grabando
             self._cerrar_segmento()
             while self.segmentos and not self.segmentos[-1]["teclas"]:
                 self.segmentos.pop()      # quita la espera final
             while self.segmentos and not self.segmentos[0]["teclas"]:
                 self.segmentos.pop(0)     # y la del principio
             self.grabando = False
+            estados.put(("grabando", False))
+            if not any(s["teclas"] for s in self.segmentos):
+                registrar("No grabaste ningún movimiento: conservo la ruta anterior")
+                return
+            if os.path.exists(ARCHIVO_RUTA):    # copia de seguridad de la ruta anterior
+                os.replace(ARCHIVO_RUTA, os.path.join(AQUI, "ruta_anterior.json"))
             with open(ARCHIVO_RUTA, "w", encoding="utf-8") as f:
                 json.dump({"norte_x": self.norte_grabado, "segmentos": self.segmentos}, f, indent=1)
             total = sum(s["seg"] for s in self.segmentos)
             paredes = sum(1 for s in self.segmentos if s.get("pared"))
-            registrar(f"Ruta guardada: {len(self.segmentos)} tramos, {total:.1f} s, {paredes} paredes")
-            estados.put(("grabando", False))
+            registrar(f"Ruta guardada: {len(self.segmentos)} tramos, {total:.1f} s, {paredes} paredes"
+                      + ("  ¡OJO! F2 es solo para choques contra paredes o esquinas, no para puertas"
+                         if paredes > 8 else ""))
             return
         if not activar_roblox():
             registrar("No encuentro la ventana de Roblox")
@@ -612,6 +622,7 @@ class Macro:
         self.segmentos = []
         self.teclas_grabando = set()
         self.t_segmento = time.perf_counter()
+        self.inicio_grabacion = self.t_segmento
         self.pared_actual = False
         self.grabando = True
         estados.put(("grabando", True))
