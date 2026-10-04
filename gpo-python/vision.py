@@ -42,12 +42,17 @@ def _buscar_blancos(img, plantilla, x0, y0, x1, y1, umbral=185, minimo=0.97):
     return [(int(xs[i]) + x0, int(ys[i]) + y0) for i in orden]
 
 
-def knock_visible(img):
-    """¿Está en pantalla el aviso "E Knock" de una puerta?"""
+def knock_pos(img):
+    """Posición (x, y) en pantalla del aviso "E Knock" de una puerta, o None."""
     for (x, y) in _buscar_blancos(img, KNOCK, 450, 250, 1450, 750)[:20]:
         if all(img[y + dy, x + dx].max() < 150 for dx, dy in KNOCK_OSCUROS):
-            return True
-    return False
+            return (x, y)
+    return None
+
+
+def knock_visible(img):
+    """¿Está en pantalla el aviso "E Knock" de una puerta?"""
+    return knock_pos(img) is not None
 
 
 def norte_x(img):

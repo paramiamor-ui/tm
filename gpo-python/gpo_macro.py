@@ -42,7 +42,6 @@ CONFIG_INICIAL = {
     "mantener_e": 0.4,                # segundos que se mantiene E
     "espera_tras_caramelos": 1.5,     # aturdimiento después de una puerta que da caramelos
     "margen_pared": 0.5,              # segundos extra en los tramos que acaban en pared
-    "rearme_puerta": 2.0,             # segundos de ruta antes de volver a tocar si el aviso no desaparece
     "corregir_camara": True,
     "factor_giro": 0.5,
     "buscar_puertas": True,
@@ -377,9 +376,14 @@ class Macro:
 
     # ---------- ruta ----------
     def recorrer(self, ruta):
-        rearme = self.cfg["rearme_puerta"]
-        armado, t_ultimo_toque, tiempo_ruta = True, -1e9, 0.0
-        for n, seg in enumerate(ruta["segmentos"], start=1):
+        """Repite los tramos. Mientras camina busca el aviso "E Knock":
+        - toca la puerta cuando aparece un aviso nuevo (no repite mientras siga el mismo);
+        - si las teclas están pulsadas pero el aviso no se mueve en pantalla, el personaje
+          está atascado (barril, caja...): salta para soltarse."""
+        armado = True          # se puede tocar el próximo aviso
+        ultimo_pos = None      # dónde estaba el aviso en el último escaneo
+        quieto_desde = None    # (momento, posición) desde que el aviso no se mueve
+        for seg in ruta["segmentos"]:
             teclas = seg["teclas"]
             duracion = seg["seg"] + (self.cfg["margen_pared"] if seg.get("pared") else 0)
             bajar(teclas)
@@ -396,21 +400,32 @@ class Macro:
                 if (self.cfg["buscar_puertas"] and teclas and not self.lleno
                         and duracion - hecho > 0.15 and ahora >= proximo_escaneo):
                     proximo_escaneo = ahora + 0.08
-                    if not vision.knock_visible(pantalla()):
-                        armado = True
-                    elif armado or (tiempo_ruta + hecho) - t_ultimo_toque > rearme:
-                        pausa = time.perf_counter()
-                        subir(teclas)
-                        if not self.tocar_puerta():
-                            return False
-                        bajar(teclas)
-                        t0 += time.perf_counter() - pausa   # el tramo sigue donde se quedó
-                        t_ultimo_toque = tiempo_ruta + (time.perf_counter() - t0)
-                        armado = False
-                        continue
+                    pos = vision.knock_pos(pantalla())
+                    if pos is None:
+                        armado, ultimo_pos, quieto_desde = True, None, None
+                    else:
+                        # un aviso que aparece lejos del anterior es otra puerta
+                        if ultimo_pos and abs(pos[0] - ultimo_pos[0]) + abs(pos[1] - ultimo_pos[1]) > 120:
+                            armado, quieto_desde = True, None
+                        ultimo_pos = pos
+                        if armado:
+                            pausa = time.perf_counter()
+                            subir(teclas)
+                            if not self.tocar_puerta():
+                                return False
+                            bajar(teclas)
+                            t0 += time.perf_counter() - pausa   # el tramo sigue donde se quedó
+                            armado, quieto_desde = False, None
+                            continue
+                        # ¿atascado? el aviso no se mueve aunque estamos caminando
+                        if quieto_desde is None or abs(pos[0] - quieto_desde[1][0]) + abs(pos[1] - quieto_desde[1][1]) > 6:
+                            quieto_desde = (ahora, pos)
+                        elif ahora - quieto_desde[0] > 1.5:
+                            registrar("Parece atascado junto a una puerta: salto")
+                            pulsar("space", 0.15)
+                            quieto_desde = (ahora, pos)
                 time.sleep(0.004)
             subir(teclas)
-            tiempo_ruta += duracion
         return True
 
     def bucle(self):
